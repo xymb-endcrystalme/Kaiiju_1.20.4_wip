@@ -1,0 +1,156 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Wed, 28 Aug 2024 16:54:55 +0200
+Subject: [PATCH] Reliability: Thread watchdog
+
+
+diff --git a/src/main/java/abomination/ThreadStabilityWatchdog.java b/src/main/java/abomination/ThreadStabilityWatchdog.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d683019ba7158dc8a01b69115f328fe2f18c7dbf
+--- /dev/null
++++ b/src/main/java/abomination/ThreadStabilityWatchdog.java
+@@ -0,0 +1,96 @@
++package abomination;
++
++import io.papermc.paper.threadedregions.TickRegionScheduler;
++import ca.spottedleaf.moonrise.common.util.TickThread;
++import ca.spottedleaf.concurrentutil.scheduler.SchedulerThreadPool;
++import org.slf4j.Logger;
++import com.mojang.logging.LogUtils;
++import io.papermc.paper.util.StacktraceDeobfuscator;
++
++public class ThreadStabilityWatchdog {
++    private static final Logger LOGGER = LogUtils.getLogger();
++
++    private static Thread thread;
++    private static ThreadStabilityWatchdog instance;
++
++    private static Object lock = new Object();
++    private static int[] threadStamps = new int[1];
++    private static TickThread[] threads = new TickThread[1];
++
++    private void verifyThreads() {
++        int warningDelay = abomination.config.Reliability.ThreadStabilityWatchdog.warningIntervalInSeconds;
++        if (warningDelay < 1) warningDelay = 1;
++        int length = threadStamps.length;
++        int currentTime = (int)(System.currentTimeMillis() / 100);
++        for (int i = 0 ; i < length ; i++) {
++            if (threadStamps[i] != 0) {
++                int elapsed = currentTime - threadStamps[i];
++                if (elapsed > warningDelay * 10) {
++                    threadStamps[i] = currentTime;
++                    LOGGER.info("Abomination: Thread stuck - " + (elapsed / 10) + " seconds stuck");
++                    TickThread crashedThread = threads[i];
++                    if (crashedThread != null) {
++                        StackTraceElement[] stackTrace = crashedThread.getStackTrace();
++                        stackTrace = StacktraceDeobfuscator.INSTANCE.deobfuscateStacktrace(stackTrace);
++                        StringBuilder stackTraceStr = new StringBuilder("Stack trace for stuck thread:\n");
++                        for (StackTraceElement element : stackTrace) {
++                            stackTraceStr.append("\tat ").append(element.toString()).append("\n");
++                        }
++                        LOGGER.error(stackTraceStr.toString().strip());
++                    } else {
++                        LOGGER.error("Unable to retrieve stack trace for crashed thread.");
++                    }
++                    LOGGER.info("Do not contact Paper for support! Instead look for support here: https://github.com/xymb-endcrystalme/Abomination");
++                }
++            }
++        }
++    }
++
++    public ThreadStabilityWatchdog() {
++        if (thread != null) return;
++        instance = this;
++        thread = new Thread(new Runnable() {
++            @Override
++            public void run() {
++                while (!Thread.currentThread().isInterrupted()) {
++                    //LOGGER.info("Thread stability watchdog tick");
++                    verifyThreads();
++                    try {
++                        Thread.sleep(100);
++                    } catch (InterruptedException e) {
++                        Thread.currentThread().interrupt();
++                    }
++                }
++            }
++        });
++        thread.start();
++    }
++
++    public static void start() {
++        if (instance == null) instance = new ThreadStabilityWatchdog();
++    }
++
++    public static void markThread() {
++        Thread current = Thread.currentThread();
++        if (current instanceof TickThread thr) {
++            int id = thr.id;
++            if (threadStamps.length < id + 1) {
++                synchronized(lock) {
++                    threadStamps = new int[id + 1];
++                    threads = new TickThread[id + 1];
++                }
++            }
++            threads[id] = thr;
++            threadStamps[id] = (int)(System.currentTimeMillis() / 100);
++            if (threadStamps[id] == 0) threadStamps[id] = 1;
++        }
++    }
++
++    public static void unmarkThread() {
++        Thread current = Thread.currentThread();
++        if (current instanceof TickThread thr) {
++            int id = thr.id;
++            if (threadStamps.length > id) threadStamps[id] = 0;
++        }
++    }
++}
+diff --git a/src/main/java/abomination/config/Reliability.java b/src/main/java/abomination/config/Reliability.java
+index 7c92166683e9f626c5df53058369aa44ab352624..52b89793a6c5178aa0d817e38d9eacfbf981b6a1 100644
+--- a/src/main/java/abomination/config/Reliability.java
++++ b/src/main/java/abomination/config/Reliability.java
+@@ -3,4 +3,9 @@ package abomination.config;
+ public class Reliability {
+     public static int saveMapDataEveryXSeconds = 600; // 0 to disable
+     public static boolean makeAllPluginEventsSynchronized = false; // Fixes some plugins that claim Folia compatibility, but have multithreading bugs
++
++    public static class ThreadStabilityWatchdog {
++        public static boolean enabled = true;
++        public static int warningIntervalInSeconds = 10;
++    }
+ }
+diff --git a/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java b/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java
+index 8197ccb1c4e5878dbd8007b5fb514640765ec8e4..ba1ea38d534bc32fcc3e5f96cd300652a9501e9b 100644
+--- a/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java
++++ b/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java
+@@ -508,7 +508,9 @@ public class SchedulerThreadPool {
+                 switch (startStateType) {
+                     case STATE_IDLE: {
+                         while (this.state.state == STATE_IDLE) {
++                            abomination.ThreadStabilityWatchdog.unmarkThread(); // Abomination
+                             LockSupport.park();
++                            abomination.ThreadStabilityWatchdog.markThread(); // Abomination
+                             if (this.scheduler.halted) {
+                                 return;
+                             }
+@@ -537,6 +539,7 @@ public class SchedulerThreadPool {
+                         }
+ 
+                         // TODO exception handling
++                        abomination.ThreadStabilityWatchdog.markThread(); // Abomination
+                         final boolean reschedule = startStateTask.runTick();
+ 
+                         this.returnTask(startStateTask, reschedule);
+diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+index b35a5c9e45dcc61ee7415f2b7650cdcfd37f1ff6..c1d997a28fc4e8ba50c44764ab5e634300a9b734 100644
+--- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
++++ b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+@@ -317,6 +317,7 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
+         }
+ 
+         if (abomination.config.Reliability.saveMapDataEveryXSeconds > 0) abomination.MapSaverThread.start(); // Abomination
++        abomination.ThreadStabilityWatchdog.start(); // Abomination
+ 
+         if (!OldUsersConverter.serverReadyAfterUserconversion(this)) {
+             return false;

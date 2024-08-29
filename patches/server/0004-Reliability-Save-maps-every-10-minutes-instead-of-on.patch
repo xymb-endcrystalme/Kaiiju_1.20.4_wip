@@ -1,0 +1,74 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 25 Aug 2024 04:09:32 +0200
+Subject: [PATCH] Reliability: Save maps every 10 minutes instead of only on
+ server shutdown
+
+
+diff --git a/src/main/java/abomination/MapSaverThread.java b/src/main/java/abomination/MapSaverThread.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..daab3516e9c24761f1ba8583d4423e2823dd1678
+--- /dev/null
++++ b/src/main/java/abomination/MapSaverThread.java
+@@ -0,0 +1,39 @@
++package abomination;
++
++import net.minecraft.server.MinecraftServer;
++
++public class MapSaverThread {
++    private static Thread thread;
++    private static MapSaverThread instance;
++
++    long lastSave = System.currentTimeMillis();
++
++    public MapSaverThread() {
++        if (thread != null) return;
++        instance = this;
++        thread = new Thread(new Runnable() {
++            @Override
++            public void run() {
++                while (!Thread.currentThread().isInterrupted()) {
++                    int interval = abomination.config.Reliability.saveMapDataEveryXSeconds;
++                    if (interval > 0 && (System.currentTimeMillis() - lastSave) / 1000 >= interval) {
++                        lastSave = System.currentTimeMillis();
++                        MinecraftServer.getServer().getAllLevels().forEach((world) -> {
++                            world.getDataStorage().save(true);
++                        });
++                    }
++                    try {
++                        Thread.sleep(1000);
++                    } catch (InterruptedException e) {
++                        Thread.currentThread().interrupt();
++                    }
++                }
++            }
++        });
++        thread.start();
++    }
++
++    public static void start() {
++        if (instance == null) instance = new MapSaverThread();
++    }
++}
+diff --git a/src/main/java/abomination/config/Reliability.java b/src/main/java/abomination/config/Reliability.java
+index 88d72da76b6476fdce8ce39cabfe09520132164c..90b54c9f06acd586fd713ec8eb810fb62858207e 100644
+--- a/src/main/java/abomination/config/Reliability.java
++++ b/src/main/java/abomination/config/Reliability.java
+@@ -1,4 +1,5 @@
+ package abomination.config;
+ 
+ public class Reliability {
++    public static int saveMapDataEveryXSeconds = 600; // 0 to disable
+ }
+diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+index f677bf4524ea902b100b6b42eb9ef58dbf274cde..b35a5c9e45dcc61ee7415f2b7650cdcfd37f1ff6 100644
+--- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
++++ b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+@@ -316,6 +316,7 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
+             DedicatedServer.LOGGER.warn("To change this, set \"online-mode\" to \"true\" in the server.properties file.");
+         }
+ 
++        if (abomination.config.Reliability.saveMapDataEveryXSeconds > 0) abomination.MapSaverThread.start(); // Abomination
+ 
+         if (!OldUsersConverter.serverReadyAfterUserconversion(this)) {
+             return false;

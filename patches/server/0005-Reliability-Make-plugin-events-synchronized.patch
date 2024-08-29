@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Tue, 27 Aug 2024 03:18:36 +0200
+Subject: [PATCH] Reliability: Make plugin events synchronized.
+
+To fix some plugins that claim Folia compatibility, but in reality fail at multithreading.
+
+diff --git a/src/main/java/abomination/config/Reliability.java b/src/main/java/abomination/config/Reliability.java
+index 90b54c9f06acd586fd713ec8eb810fb62858207e..7c92166683e9f626c5df53058369aa44ab352624 100644
+--- a/src/main/java/abomination/config/Reliability.java
++++ b/src/main/java/abomination/config/Reliability.java
+@@ -2,4 +2,5 @@ package abomination.config;
+ 
+ public class Reliability {
+     public static int saveMapDataEveryXSeconds = 600; // 0 to disable
++    public static boolean makeAllPluginEventsSynchronized = false; // Fixes some plugins that claim Folia compatibility, but have multithreading bugs
+ }
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
+index 7ce9ebba8ce304d1f3f21d4f15ee5f3560d7700b..5ef131cdda870f58e09e887ec5a1375d1cf41913 100644
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
+@@ -29,6 +29,7 @@ import java.util.logging.Level;
+ class PaperEventManager {
+ 
+     private final Server server;
++    public static final Object lock = new Object(); // Abomination
+ 
+     public PaperEventManager(Server server) {
+         this.server = server;
+@@ -51,6 +52,11 @@ class PaperEventManager {
+             }
+ 
+             try {
++                if (abomination.config.Reliability.makeAllPluginEventsSynchronized) {
++                    synchronized (lock) { // Abomination - never run plugins async
++                        registration.callEvent(event);
++                    }
++                } else
+                 registration.callEvent(event);
+             } catch (AuthorNagException ex) {
+                 Plugin plugin = registration.getPlugin();

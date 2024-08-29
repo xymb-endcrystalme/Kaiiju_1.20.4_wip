@@ -1,0 +1,42 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: "Xymb (aider)" <xymb@endcrystal.me>
+Date: Sun, 11 Aug 2024 15:51:29 +0200
+Subject: [PATCH] fix: resolve compilation errors in TypedDataComponent and
+ DataComponentType classes
+
+
+diff --git a/src/main/java/net/minecraft/core/component/DataComponentType.java b/src/main/java/net/minecraft/core/component/DataComponentType.java
+index 6e1748dc5a1df60f8df9f3ec445f0f208a01e5dd..d98e44df418361e032c58b76205a59c826596038 100644
+--- a/src/main/java/net/minecraft/core/component/DataComponentType.java
++++ b/src/main/java/net/minecraft/core/component/DataComponentType.java
+@@ -100,7 +100,7 @@ public interface DataComponentType<T> {
+ 
+             @Override
+             public String toString() {
+-                return Util.getRegisteredName((Registry<DataComponentType.Builder.SimpleType<T>>)BuiltInRegistries.DATA_COMPONENT_TYPE, this);
++                return Util.getRegisteredName(BuiltInRegistries.DATA_COMPONENT_TYPE, this);
+             }
+         }
+     }
+diff --git a/src/main/java/net/minecraft/core/component/TypedDataComponent.java b/src/main/java/net/minecraft/core/component/TypedDataComponent.java
+index eb9e610245426f20656cbdbb99c8838e5b0b3662..13ad58f6adfff71edcdd123444942e8234a4ea17 100644
+--- a/src/main/java/net/minecraft/core/component/TypedDataComponent.java
++++ b/src/main/java/net/minecraft/core/component/TypedDataComponent.java
+@@ -12,7 +12,7 @@ public record TypedDataComponent<T>(DataComponentType<T> type, T value) {
+         @Override
+         public TypedDataComponent<?> decode(RegistryFriendlyByteBuf registryFriendlyByteBuf) {
+             DataComponentType<?> dataComponentType = DataComponentType.STREAM_CODEC.decode(registryFriendlyByteBuf);
+-            return decodeTyped(registryFriendlyByteBuf, (DataComponentType<T>)dataComponentType);
++            return decodeTyped(registryFriendlyByteBuf, dataComponentType);
+         }
+ 
+         private static <T> TypedDataComponent<T> decodeTyped(RegistryFriendlyByteBuf buf, DataComponentType<T> type) {
+@@ -21,7 +21,7 @@ public record TypedDataComponent<T>(DataComponentType<T> type, T value) {
+ 
+         @Override
+         public void encode(RegistryFriendlyByteBuf registryFriendlyByteBuf, TypedDataComponent<?> typedDataComponent) {
+-            encodeCap(registryFriendlyByteBuf, (TypedDataComponent<T>)typedDataComponent);
++            encodeCap(registryFriendlyByteBuf, typedDataComponent);
+         }
+ 
+         private static <T> void encodeCap(RegistryFriendlyByteBuf buf, TypedDataComponent<T> component) {

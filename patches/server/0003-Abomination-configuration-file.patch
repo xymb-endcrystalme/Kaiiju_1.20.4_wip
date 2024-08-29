@@ -1,0 +1,625 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Wed, 7 Aug 2024 15:24:11 +0200
+Subject: [PATCH] Abomination configuration file
+
+
+diff --git a/build.gradle.kts b/build.gradle.kts
+index a9ff88735c6e22f3588277cdc80cb20c24e19fe7..f03e2058f2ee18b976f04ff8a43300572d4df327 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -65,6 +65,9 @@ dependencies {
+     implementation("me.lucko:spark-api:0.1-20240720.200737-2")
+     implementation("me.lucko:spark-paper:1.10.99-SNAPSHOT")
+     // Paper end - spark
++    // Abomination start
++    implementation("org.reflections:reflections:0.10.2")
++    // Abomination end
+ }
+ 
+ paperweight {
+diff --git a/src/main/java/abomination/AbominationCommand.java b/src/main/java/abomination/AbominationCommand.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9fe4ac3bfb69fc626ba48208e6f629bcd875cd78
+--- /dev/null
++++ b/src/main/java/abomination/AbominationCommand.java
+@@ -0,0 +1,51 @@
++package abomination;
++
++import net.md_5.bungee.api.ChatColor;
++import org.bukkit.Location;
++import org.bukkit.command.Command;
++import org.bukkit.command.CommandSender;
++
++import java.awt.*;
++import java.util.Collections;
++import java.util.List;
++import java.util.stream.Collectors;
++import java.util.stream.Stream;
++
++public class AbominationCommand extends Command {
++    public AbominationCommand(String name) {
++        super(name);
++        this.description = "Abomination command";
++        this.usageMessage = "/abomination reload";
++        this.setPermission("bukkit.command.abomination");
++    }
++
++    @Override
++    public List<String> tabComplete(CommandSender sender, String alias, String[] args, Location location) throws IllegalArgumentException {
++        if (args.length == 1) {
++            return Stream.of("reload")
++                    .filter(arg -> arg.startsWith(args[0].toLowerCase()))
++                    .collect(Collectors.toList());
++        }
++        return Collections.emptyList();
++    }
++
++    @Override
++    public boolean execute(CommandSender sender, String commandLabel, String[] args) {
++        if (!testPermission(sender)) return true;
++
++        if (args.length != 1) {
++            sender.sendMessage(ChatColor.RED + "Usage: " + usageMessage);
++            return false;
++        }
++
++        if (args[0].equalsIgnoreCase("reload")) {
++            Command.broadcastCommandMessage(sender, ChatColor.RED + "Be careful, this command works only partially. Don't use it if you don't know what you're doing!");
++            abomination.AbominationConfiguration.reload();
++        } else {
++            sender.sendMessage(ChatColor.RED + "Usage: " + usageMessage);
++            return false;
++        }
++
++        return true;
++    }
++}
+\ No newline at end of file
+diff --git a/src/main/java/abomination/AbominationConfiguration.java b/src/main/java/abomination/AbominationConfiguration.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d97972ba2abd131b76a60365f0d646ca152bc4e5
+--- /dev/null
++++ b/src/main/java/abomination/AbominationConfiguration.java
+@@ -0,0 +1,213 @@
++package abomination;
++
++import java.io.*;
++import java.lang.reflect.Field;
++import java.util.*;
++import java.nio.file.*;
++import org.reflections.Reflections;
++import org.reflections.scanners.*;
++import org.reflections.util.*;
++
++public class AbominationConfiguration {
++
++    private static class ConfigEntry {
++        String key;
++        String defaultValue;
++        Field field;
++
++        ConfigEntry(String key, String defaultValue, Field field) {
++            this.key = key;
++            this.defaultValue = defaultValue;
++            this.field = field;
++        }
++
++        void setValue(Properties properties) {
++            try {
++                String value = properties.getProperty(key, defaultValue);
++                if (field.getType() == String.class) {
++                    field.set(null, value);
++                } else if (field.getType() == int.class) {
++                    field.set(null, Integer.parseInt(value));
++                } else if (field.getType() == boolean.class) {
++                    field.set(null, Boolean.parseBoolean(value));
++                }
++            } catch (IllegalAccessException e) {
++                e.printStackTrace();
++            }
++        }
++    }
++
++    private static final Map<String, ConfigEntry> defaultConfigEntries = new TreeMap<>();
++    private static File configFile;
++
++    public static void reload() {
++        reload("abomination.config");
++    }
++
++    public static void reload(String classPath) {
++        defaultConfigEntries.clear();
++        scanConfigClasses(classPath);
++        configFile = new File(System.getProperty("user.dir"), "abomination/abomination.yml");
++        Properties properties = loadConfigFile(configFile);
++        boolean hasNewValues = setDefaultValues(properties);
++        if (hasNewValues) {
++            saveConfigFile(properties, configFile);
++        }
++        loadValuesIntoConfig(properties);
++    }
++
++    private static boolean isSupportedType(Class<?> type) {
++        return type == String.class || type == int.class || type == boolean.class;
++    }
++
++    private static Properties loadConfigFile(File configFile) {
++        Properties properties = new Properties();
++        if (configFile.exists()) {
++            try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {
++                String line;
++                String category = "";
++                String subCategory = "";
++                while ((line = reader.readLine()) != null) {
++                    line = line.replaceAll("\\s+$", ""); // Trim the end of the line
++                    int commentIndex = line.indexOf('#');
++                    if (commentIndex != -1) {
++                        line = line.substring(0, commentIndex); // Remove comments
++                    }
++                    if (line.endsWith(":")) {
++                        if (!line.startsWith("  ")) {
++                            category = line.substring(0, line.length() - 1).trim();
++                            subCategory = "";
++                        } else {
++                            subCategory = line.substring(2, line.length() - 1).trim();
++                        }
++                    } else {
++                        String[] parts = line.split(": ");
++                        if (parts.length == 2) {
++                            String key = category + (subCategory.isEmpty() ? "" : "." + subCategory) + "." + parts[0].trim();
++                            properties.setProperty(key, parts[1].trim());
++                        }
++                    }
++                }
++            } catch (IOException e) {
++                e.printStackTrace();
++            }
++        }
++        return properties;
++    }
++
++    private static boolean setDefaultValues(Properties properties) {
++        boolean hasNewValues = false;
++        for (ConfigEntry entry : defaultConfigEntries.values()) {
++            if (!properties.containsKey(entry.key)) {
++                properties.setProperty(entry.key, entry.defaultValue);
++                hasNewValues = true;
++            }
++        }
++        return hasNewValues;
++    }
++
++    private static void saveConfigFile(Properties properties, File configFile) {
++        try {
++            Files.createDirectories(configFile.getParentFile().toPath());
++            try (FileWriter writer = new FileWriter(configFile)) {
++                Map<String, Map<String, String>> structuredConfig = new TreeMap<>((a, b) -> {
++                    // Funny sorting: '.' comes before '-'
++                    return a.replace('.', '\0').compareTo(b.replace('.', '\0'));
++                });
++
++                // Organize properties into a structured map
++                for (String key : properties.stringPropertyNames()) {
++                    String[] parts = key.split("\\.");
++                    String value = properties.getProperty(key);
++
++                    if (parts.length == 2) {
++                        structuredConfig
++                            .computeIfAbsent(parts[0], k -> new TreeMap<>())
++                            .put(parts[1], value);
++                    } else if (parts.length == 3) {
++                        structuredConfig
++                            .computeIfAbsent(parts[0] + "." + parts[1], k -> new TreeMap<>())
++                            .put(parts[2], value);
++                    }
++                }
++
++                String lastCategory = "";
++                // Write the structured config to the file
++                for (Map.Entry<String, Map<String, String>> category : structuredConfig.entrySet()) {
++                    String[] categoryParts = category.getKey().split("\\.");
++                    if (categoryParts.length == 1) {
++                        writer.write(category.getKey() + ":\n");
++                        lastCategory = categoryParts[0];
++                        for (Map.Entry<String, String> entry : category.getValue().entrySet()) {
++                            writer.write("  " + entry.getKey() + ": " + entry.getValue() + "\n");
++                        }
++                    } else {
++                        if (!categoryParts[0].equals(lastCategory)) {
++                            writer.write(categoryParts[0] + ":\n");
++                            lastCategory = categoryParts[0];
++                        }
++                        writer.write("  " + categoryParts[1] + ":\n");
++                        for (Map.Entry<String, String> entry : category.getValue().entrySet()) {
++                            writer.write("    " + entry.getKey() + ": " + entry.getValue() + "\n");
++                        }
++                    }
++                }
++            }
++        } catch (IOException e) {
++            e.printStackTrace();
++        }
++    }
++
++    private static void loadValuesIntoConfig(Properties properties) {
++        for (ConfigEntry entry : defaultConfigEntries.values()) {
++            entry.setValue(properties);
++        }
++    }
++
++    private static String convertToCategory(String className) {
++        return className.replaceAll("([a-z])([A-Z]+)", "$1-$2").toLowerCase();
++    }
++
++    private static String convertToKey(String fieldName) {
++        return fieldName.replaceAll("([a-z])([A-Z]+)", "$1-$2").toLowerCase();
++    }
++
++    private static void scanConfigClasses(String classPath) {
++        Reflections reflections = new Reflections(new ConfigurationBuilder()
++            .setUrls(ClasspathHelper.forPackage(classPath))
++            .setScanners(new SubTypesScanner(false), new TypeAnnotationsScanner())
++            .filterInputsBy(new FilterBuilder().includePackage(classPath)));
++
++        Set<Class<?>> configClasses = reflections.getSubTypesOf(Object.class);
++
++        for (Class<?> configClass : configClasses) {
++            String category = convertToCategory(configClass.getSimpleName());
++            for (Field field : configClass.getDeclaredFields()) {
++                if (!isSupportedType(field.getType())) continue;
++                String[] fieldParts = field.toString().split(" ");
++                String fieldPath = fieldParts[fieldParts.length - 1];
++                if (fieldPath.contains("$")) {
++                    String[] parts = fieldPath.split("\\$");
++                    String[] categoryParts = parts[0].split("\\.");
++                    String[] subcategoryParts = parts[1].split("\\.");
++                    category = categoryParts[categoryParts.length - 1];
++                    String subcategory = subcategoryParts[0];
++                    String key = convertToCategory(category) + "." + convertToCategory(subcategory) + "." + convertToKey(field.getName());
++                    addConfigEntry(key, field);
++                } else {
++                    String key = category + "." + convertToKey(field.getName());
++                    addConfigEntry(key, field);
++                }
++            }
++        }
++    }
++
++    private static void addConfigEntry(String key, Field field) {
++        try {
++            String defaultValue = String.valueOf(field.get(null));
++            defaultConfigEntries.put(key, new ConfigEntry(key, defaultValue, field));
++        } catch (IllegalAccessException e) {
++            e.printStackTrace();
++        }
++    }
++}
+diff --git a/src/main/java/abomination/config/BeCarefulReadDocs.java b/src/main/java/abomination/config/BeCarefulReadDocs.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9c1c191016d900b3eef3792fbe7981f86bcd3b17
+--- /dev/null
++++ b/src/main/java/abomination/config/BeCarefulReadDocs.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class BeCarefulReadDocs {
++}
+diff --git a/src/main/java/abomination/config/Experimental.java b/src/main/java/abomination/config/Experimental.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9003f5aa67cec38d6a2dc5a5907861bb25c14b35
+--- /dev/null
++++ b/src/main/java/abomination/config/Experimental.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class Experimental {
++}
+diff --git a/src/main/java/abomination/config/Exploit.java b/src/main/java/abomination/config/Exploit.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..50a6cfabb15d1f0acd1646a8c98b649c02671f4f
+--- /dev/null
++++ b/src/main/java/abomination/config/Exploit.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class Exploit {
++}
+diff --git a/src/main/java/abomination/config/Gameplay.java b/src/main/java/abomination/config/Gameplay.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b9a08833c4ec9c447ce9c0329228a5c3872a3b3c
+--- /dev/null
++++ b/src/main/java/abomination/config/Gameplay.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class Gameplay {
++}
+diff --git a/src/main/java/abomination/config/GameplayOptimization.java b/src/main/java/abomination/config/GameplayOptimization.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..c56c45011e2eef89f8d5b6c4c1fee0d86d317670
+--- /dev/null
++++ b/src/main/java/abomination/config/GameplayOptimization.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class GameplayOptimization {
++}
+diff --git a/src/main/java/abomination/config/Networking.java b/src/main/java/abomination/config/Networking.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..a60e46dfd7415f013b3f50422bed36f1aafb727c
+--- /dev/null
++++ b/src/main/java/abomination/config/Networking.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class Networking {
++}
+diff --git a/src/main/java/abomination/config/Performance.java b/src/main/java/abomination/config/Performance.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..d6c714371b7f03875c14daeb8b1719b421e28f19
+--- /dev/null
++++ b/src/main/java/abomination/config/Performance.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class Performance {
++}
+diff --git a/src/main/java/abomination/config/Reliability.java b/src/main/java/abomination/config/Reliability.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..88d72da76b6476fdce8ce39cabfe09520132164c
+--- /dev/null
++++ b/src/main/java/abomination/config/Reliability.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class Reliability {
++}
+diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+index 301d7fa29fce2997a5881b3852896eff5af33672..f677bf4524ea902b100b6b42eb9ef58dbf274cde 100644
+--- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
++++ b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+@@ -240,6 +240,8 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
+         com.destroystokyo.paper.Metrics.PaperMetrics.startMetrics(); // Paper - start metrics
+         com.destroystokyo.paper.VersionHistoryManager.INSTANCE.getClass(); // Paper - load version history now
+ 
++        MinecraftServer.getServer().server.getCommandMap().register("abomination", "Abomination", new abomination.AbominationCommand("abomination")); // Abomination
++
+         this.setPvpAllowed(dedicatedserverproperties.pvp);
+         this.setFlightAllowed(dedicatedserverproperties.allowFlight);
+         this.setMotd(dedicatedserverproperties.motd);
+diff --git a/src/main/java/org/bukkit/craftbukkit/Main.java b/src/main/java/org/bukkit/craftbukkit/Main.java
+index c1e88c31910e96ef07cece05046c0b55e708b52d..946168c6e9967413074e206d759dd088b45b0249 100644
+--- a/src/main/java/org/bukkit/craftbukkit/Main.java
++++ b/src/main/java/org/bukkit/craftbukkit/Main.java
+@@ -188,6 +188,8 @@ public class Main {
+ 
+         OptionSet options = null;
+ 
++        abomination.AbominationConfiguration.reload(); // Abomination
++
+         try {
+             options = parser.parse(args);
+         } catch (joptsimple.OptionException ex) {
+diff --git a/src/test/java/abomination/AbominationConfigurationTest.java b/src/test/java/abomination/AbominationConfigurationTest.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..9ef49a3a41424fe329d6c9065196d4f7dd86955b
+--- /dev/null
++++ b/src/test/java/abomination/AbominationConfigurationTest.java
+@@ -0,0 +1,170 @@
++package abomination;
++
++import abomination.testconfig.TestConfig;
++import abomination.testconfig.TestConfigSecond;
++import org.junit.jupiter.api.Test;
++import org.junit.jupiter.api.io.TempDir;
++import java.io.File;
++import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++
++import static org.junit.jupiter.api.Assertions.*;
++
++class AbominationConfigurationTest {
++
++    @TempDir
++    Path tempDir;
++
++    @Test
++    void testConfigurationCreationAndModification() throws IOException {
++        File configDir = new File(tempDir.toFile(), "abomination");
++        configDir.mkdirs();
++        System.setProperty("user.dir", tempDir.toString());
++
++        File configFile = new File(configDir, "abomination.yml");
++        if (configFile.exists()) {
++            Files.delete(configFile.toPath());
++        }
++
++        AbominationConfiguration.reload("abomination.testconfig");
++        AbominationConfiguration.reload("abomination.testconfig");
++        AbominationConfiguration.reload("abomination.testconfig");
++
++        assertTrue(configFile.exists(), "Config file should be created");
++
++        String content = Files.readString(configFile.toPath());
++
++        assertTrue(content.contains("test-config:"), "Config should contain the test-config category");
++        assertTrue(content.contains("  string-value: default"), "Config should contain the default string value");
++        assertTrue(content.contains("  int-value: 42"), "Config should contain the default int value");
++        assertTrue(content.contains("  boolean-value: true"), "Config should contain the default boolean value");
++        assertTrue(content.contains("  section-one:"), "Config should contain the section-one subcategory");
++        assertTrue(content.contains("    string-value-one: default"), "Config should contain the default string value for section-one");
++        assertTrue(content.contains("    int-value-one: 42"), "Config should contain the default int value for section-one");
++        assertTrue(content.contains("    boolean-value-one: true"), "Config should contain the default boolean value for section-one");
++        assertTrue(content.contains("  section-two:"), "Config should contain the section-two subcategory");
++        assertTrue(content.contains("    string-value-two: default"), "Config should contain the default string value for section-two");
++        assertTrue(content.contains("    int-value-two: 42"), "Config should contain the default int value for section-two");
++        assertTrue(content.contains("    boolean-value-two: true"), "Config should contain the default boolean value for section-two");
++
++        assertTrue(content.contains("test-config-second:"), "Config should contain the test-config-second category");
++        assertTrue(content.contains("  string-value: default"), "Config should contain the default string value for TestConfigSecond");
++        assertTrue(content.contains("  int-value: 42"), "Config should contain the default int value for TestConfigSecond");
++        assertTrue(content.contains("  boolean-value: true"), "Config should contain the default boolean value for TestConfigSecond");
++        assertTrue(content.contains("  section-one:"), "Config should contain the section-one subcategory for TestConfigSecond");
++        assertTrue(content.contains("    string-value-one: default"), "Config should contain the default string value for section-one in TestConfigSecond");
++        assertTrue(content.contains("    int-value-one: 42"), "Config should contain the default int value for section-one in TestConfigSecond");
++        assertTrue(content.contains("    boolean-value-one: true"), "Config should contain the default boolean value for section-one in TestConfigSecond");
++        assertTrue(content.contains("  section-two:"), "Config should contain the section-two subcategory for TestConfigSecond");
++        assertTrue(content.contains("    string-value-two: default"), "Config should contain the default string value for section-two in TestConfigSecond");
++        assertTrue(content.contains("    int-value-two: 42"), "Config should contain the default int value for section-two in TestConfigSecond");
++        assertTrue(content.contains("    boolean-value-two: true"), "Config should contain the default boolean value for section-two in TestConfigSecond");
++
++        String modifiedContent = content
++                .replaceFirst("test-config:", "test-config:")
++                .replaceFirst("  string-value: default", "  string-value: modified")
++                .replaceFirst("  int-value: 42", "  int-value: 100")
++                .replaceFirst("  boolean-value: true", "  boolean-value: false")
++                .replaceFirst("    string-value-one: default", "    string-value-one: modified-section-one")
++                .replaceFirst("    int-value-one: 42", "    int-value-one: 666")
++                .replaceFirst("test-config-second:", "test-config-second:")
++                .replaceFirst("  string-value: default", "  string-value: modified-second")
++                .replaceFirst("  int-value: 42", "  int-value: 200")
++                .replaceFirst("  boolean-value: true", "  boolean-value: false")
++                .replaceFirst("    string-value-two: default", "    string-value-two: first")
++                .replaceFirst("    string-value-two: default", "    string-value-two: modified-section-two-second")
++                .replaceFirst("    int-value-two: 42", "    int-value-two: 666")
++                .replaceFirst("    int-value-two: 42", "    int-value-two: 999")
++                .replaceFirst("    boolean-value-two: true", "  boolean-value-two: false");
++        Files.writeString(configFile.toPath(), modifiedContent);
++
++        AbominationConfiguration.reload("abomination.testconfig");
++
++        assertEquals("modified", TestConfig.stringValue);
++        assertEquals(100, TestConfig.intValue);
++        assertFalse(TestConfig.booleanValue);
++        assertEquals("modified-section-one", TestConfig.SectionOne.stringValueOne);
++        assertEquals(666, TestConfig.SectionOne.intValueOne);
++
++        assertEquals("modified-second", TestConfigSecond.stringValue);
++        assertEquals(200, TestConfigSecond.intValue);
++        assertFalse(TestConfigSecond.booleanValue);
++        assertEquals("default", TestConfigSecond.SectionOne.stringValueOne);
++        assertEquals(42, TestConfigSecond.SectionOne.intValueOne);
++        assertTrue(TestConfigSecond.SectionOne.booleanValueOne);
++
++        assertEquals("first", TestConfig.SectionTwo.stringValueTwo);
++        assertEquals("modified-section-two-second", TestConfigSecond.SectionTwo.stringValueTwo);
++        assertEquals(666, TestConfig.SectionTwo.intValueTwo);
++        assertEquals(999, TestConfigSecond.SectionTwo.intValueTwo);
++        assertFalse(TestConfig.SectionTwo.booleanValueTwo);
++        assertTrue(TestConfigSecond.SectionTwo.booleanValueTwo);
++    }
++
++    @Test
++    void testConfigNotRewrittenWithoutNewValues() throws IOException {
++        // Set up a temporary directory for the config file
++        File configDir = new File(tempDir.toFile(), "abomination");
++        configDir.mkdirs();
++        System.setProperty("user.dir", tempDir.toString());
++        File configFile = new File(configDir, "abomination.yml");
++
++        // Remove abomination.yml if it exists
++        if (configFile.exists()) {
++            Files.delete(configFile.toPath());
++        }
++
++        // Create an initial config file with a comment
++        String initialConfig = """
++# This is a test comment
++unique-category:
++  lol-value: 
++test-config:
++  string-value: default
++  int-value: 42
++  boolean-value: true
++""";
++        Files.writeString(configFile.toPath(), initialConfig);
++
++        AbominationConfiguration.reload("abomination.testconfig");
++
++        String content = Files.readString(configFile.toPath());
++
++        assertFalse(content.contains("# This is a test comment"));
++
++        Files.writeString(configFile.toPath(), "# This is a test comment\n", java.nio.file.StandardOpenOption.APPEND);
++
++        AbominationConfiguration.reload("abomination.testconfig");
++        AbominationConfiguration.reload("abomination.testconfig");
++        AbominationConfiguration.reload("abomination.testconfig");
++        content = Files.readString(configFile.toPath());
++
++        assertTrue(content.contains("# This is a test comment"), "Comment should be gone after rewrite");
++
++        assertEquals(42, TestConfig.intValue);
++
++        content = Files.readString(configFile.toPath());
++        String modifiedContent = content
++                .replaceFirst("  int-value: 42", "  int-value: 666");
++        Files.writeString(configFile.toPath(), modifiedContent);
++
++        AbominationConfiguration.reload("abomination.testconfig");
++        content = Files.readString(configFile.toPath());
++
++        assertEquals(666, TestConfig.intValue);
++        assertTrue(content.contains("# This is a test comment"), "Comment should be gone after rewrite");
++        assertTrue(content.contains("int-value: 666"));
++
++        java.util.List<String> lines = Files.readAllLines(configFile.toPath());
++        lines.removeIf(line -> line.contains("int-value:"));
++        Files.write(configFile.toPath(), lines);
++
++        AbominationConfiguration.reload("abomination.testconfig");
++        content = Files.readString(configFile.toPath());
++        assertFalse(content.contains("# This is a test comment"), "Comment should be gone after rewrite");
++        assertTrue(content.contains("int-value: 666"));
++        assertEquals(666, TestConfig.intValue);
++        TestConfig.intValue = 42;
++    }
++}
+diff --git a/src/test/java/abomination/testconfig/TestConfig.java b/src/test/java/abomination/testconfig/TestConfig.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6101dc15543df1bb1afe12a9c784f0f42667e575
+--- /dev/null
++++ b/src/test/java/abomination/testconfig/TestConfig.java
+@@ -0,0 +1,17 @@
++package abomination.testconfig;
++
++public class TestConfig {
++    public static class SectionOne {
++        public static String stringValueOne = "default";
++        public static int intValueOne = 42;
++        public static boolean booleanValueOne = true;
++    }
++    public static class SectionTwo {
++        public static String stringValueTwo = "default";
++        public static int intValueTwo = 42;
++        public static boolean booleanValueTwo = true;
++    }
++    public static String stringValue = "default";
++    public static int intValue = 42;
++    public static boolean booleanValue = true;
++}
+diff --git a/src/test/java/abomination/testconfig/TestConfigSecond.java b/src/test/java/abomination/testconfig/TestConfigSecond.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..b174c3e3af03b539922e4d2ec37e679b8fd853ad
+--- /dev/null
++++ b/src/test/java/abomination/testconfig/TestConfigSecond.java
+@@ -0,0 +1,17 @@
++package abomination.testconfig;
++
++public class TestConfigSecond {
++    public static class SectionOne {
++        public static String stringValueOne = "default";
++        public static int intValueOne = 42;
++        public static boolean booleanValueOne = true;
++    }
++    public static class SectionTwo {
++        public static String stringValueTwo = "default";
++        public static int intValueTwo = 42;
++        public static boolean booleanValueTwo = true;
++    }
++    public static String stringValue = "default";
++    public static int intValue = 42;
++    public static boolean booleanValue = true;
++}
