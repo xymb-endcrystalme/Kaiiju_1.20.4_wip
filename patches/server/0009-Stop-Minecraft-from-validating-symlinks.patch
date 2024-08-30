@@ -1,0 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 8 Aug 2024 08:43:50 +0200
+Subject: [PATCH] Stop Minecraft from validating symlinks
+
+It's a problem when there are millions of region files
+
+diff --git a/src/main/java/net/minecraft/world/level/storage/LevelStorageSource.java b/src/main/java/net/minecraft/world/level/storage/LevelStorageSource.java
+index 85ba843ce7e1f62971e736fa2cc028c47b274ce4..883edc953d56e59b890a363cd4e5c8d8add36a93 100644
+--- a/src/main/java/net/minecraft/world/level/storage/LevelStorageSource.java
++++ b/src/main/java/net/minecraft/world/level/storage/LevelStorageSource.java
+@@ -420,7 +420,7 @@ public class LevelStorageSource {
+ 
+     public LevelStorageSource.LevelStorageAccess validateAndCreateAccess(String s, ResourceKey<LevelStem> dimensionType) throws IOException, ContentValidationException { // CraftBukkit
+         Path path = this.getLevelPath(s);
+-        List<ForbiddenSymlinkInfo> list = Boolean.getBoolean("paper.disableWorldSymlinkValidation") ? List.of() : this.worldDirValidator.validateDirectory(path, true); // Paper - add skipping of symlinks scan
++        List<ForbiddenSymlinkInfo> list = new ArrayList<ForbiddenSymlinkInfo>(); // Abomination
+ 
+         if (!list.isEmpty()) {
+             throw new ContentValidationException(path, list);

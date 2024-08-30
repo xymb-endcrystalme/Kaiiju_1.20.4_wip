@@ -1,0 +1,34 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 8 Aug 2024 15:44:07 +0200
+Subject: [PATCH] Optimize getNearestPlayer for high player count
+
+
+diff --git a/src/main/java/net/minecraft/world/level/EntityGetter.java b/src/main/java/net/minecraft/world/level/EntityGetter.java
+index f8435c25c3fe740c95fb8d4c8ce868fece5151de..435559deef77c67875511fed63595ce2db274df1 100644
+--- a/src/main/java/net/minecraft/world/level/EntityGetter.java
++++ b/src/main/java/net/minecraft/world/level/EntityGetter.java
+@@ -132,9 +132,9 @@ public interface EntityGetter extends ca.spottedleaf.moonrise.patches.chunk_syst
+         Player player = null;
+ 
+         for (Player player2 : this.getLocalPlayers()) { // Folia - region threading
+-            if (targetPredicate == null || targetPredicate.test(player2)) {
++            if (true) { // Abomination
+                 double e = player2.distanceToSqr(x, y, z);
+-                if ((maxDistance < 0.0 || e < maxDistance * maxDistance) && (d == -1.0 || e < d)) {
++                if ((maxDistance < 0.0D || e < maxDistance * maxDistance) && (d == -1.0D || e < d) && (targetPredicate == null || targetPredicate.test(player2))) { // Abomination
+                     d = e;
+                     player = player2;
+                 }
+@@ -234,9 +234,9 @@ public interface EntityGetter extends ca.spottedleaf.moonrise.patches.chunk_syst
+         T livingEntity = null;
+ 
+         for (T livingEntity2 : entityList) {
+-            if (targetPredicate.test(entity, livingEntity2)) {
++            if (true) { // Abomination
+                 double e = livingEntity2.distanceToSqr(x, y, z);
+-                if (d == -1.0 || e < d) {
++                if ((d == -1.0D || e < d) && targetPredicate.test(entity, livingEntity2)) { // Abomination
+                     d = e;
+                     livingEntity = livingEntity2;
+                 }

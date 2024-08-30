@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 8 Aug 2024 08:14:53 +0200
+Subject: [PATCH] Option to disable shulker box items from dropping contents
+ when destroyed
+
+Credit: William Blake Galbreath <blake.galbreath@gmail.com> from Purpur
+
+diff --git a/src/main/java/abomination/config/Gameplay.java b/src/main/java/abomination/config/Gameplay.java
+index b9a08833c4ec9c447ce9c0329228a5c3872a3b3c..f4af8e01fe3208361e7ab79d8e0899c2409be314 100644
+--- a/src/main/java/abomination/config/Gameplay.java
++++ b/src/main/java/abomination/config/Gameplay.java
+@@ -1,4 +1,5 @@
+ package abomination.config;
+ 
+ public class Gameplay {
++    public static boolean shulkerBoxItemDropContentsWhenDestroyed = true;
+ }
+diff --git a/src/main/java/net/minecraft/world/item/BlockItem.java b/src/main/java/net/minecraft/world/item/BlockItem.java
+index 96fb69ec6db2e7c8c728435f0c537b076259b2fb..e80ea8b55852b4c6a856b6fdf3220b660b3cefb4 100644
+--- a/src/main/java/net/minecraft/world/item/BlockItem.java
++++ b/src/main/java/net/minecraft/world/item/BlockItem.java
+@@ -259,6 +259,7 @@ public class BlockItem extends Item {
+         ItemContainerContents itemcontainercontents = (ItemContainerContents) entity.getItem().set(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
+ 
+         if (itemcontainercontents != null) {
++            if (abomination.config.Gameplay.shulkerBoxItemDropContentsWhenDestroyed && entity.getItem().is(Items.SHULKER_BOX)) // Abomination
+             ItemUtils.onContainerDestroyed(entity, itemcontainercontents.nonEmptyItemsCopy());
+         }
+ 

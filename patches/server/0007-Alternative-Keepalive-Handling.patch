@@ -1,0 +1,67 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 8 Aug 2024 07:50:00 +0200
+Subject: [PATCH] Alternative Keepalive Handling
+
+Credit: William Blake Galbreath <blake.galbreath@gmail.com> from Purpur
+
+diff --git a/src/main/java/abomination/config/Networking.java b/src/main/java/abomination/config/Networking.java
+index a60e46dfd7415f013b3f50422bed36f1aafb727c..da615876d8b73547daa86130c47362d819c05f0f 100644
+--- a/src/main/java/abomination/config/Networking.java
++++ b/src/main/java/abomination/config/Networking.java
+@@ -1,4 +1,5 @@
+ package abomination.config;
+ 
+ public class Networking {
++    public static boolean useAlternativeKeepAlive = false;
+ }
+diff --git a/src/main/java/net/minecraft/server/network/ServerCommonPacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
+index d766bb360eb98bab1e067cad032b54fa6455f386..478a101aa7a59326ab17609e748ed458328f8079 100644
+--- a/src/main/java/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerCommonPacketListenerImpl.java
+@@ -72,6 +72,7 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
+     private long keepAliveTime = Util.getMillis(); // Paper
+     private boolean keepAlivePending;
+     private long keepAliveChallenge;
++    private it.unimi.dsi.fastutil.longs.LongList keepAlives = new it.unimi.dsi.fastutil.longs.LongArrayList(); // Abomination
+     private long closedListenerTime;
+     private boolean closed = false;
+     private int latency;
+@@ -136,6 +137,16 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
+ 
+     @Override
+     public void handleKeepAlive(ServerboundKeepAlivePacket packet) {
++        // Abomination start
++        if (abomination.config.Networking.useAlternativeKeepAlive) {
++            if (this.keepAlivePending && !keepAlives.isEmpty() && keepAlives.contains(packet.getId())) {
++                int ping = (int) (Util.getMillis() - packet.getId());
++                this.latency = (this.latency * 3 + ping) / 4;
++                this.keepAlivePending = false;
++                keepAlives.clear(); // we got a valid response, lets roll with it and forget the rest
++            }
++        } else
++        // Abomination end
+         //PacketUtils.ensureRunningOnSameThread(packet, this, this.player.serverLevel()); // CraftBukkit // Paper - handle ServerboundKeepAlivePacket async
+         if (this.keepAlivePending && packet.getId() == this.keepAliveChallenge) {
+             int i = (int) (Util.getMillis() - this.keepAliveTime);
+@@ -265,6 +276,20 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
+         long currentTime = Util.getMillis();
+         long elapsedTime = currentTime - this.keepAliveTime;
+ 
++        // Abomination start
++        if (abomination.config.Networking.useAlternativeKeepAlive) {
++            if (elapsedTime >= 1000L) { // 1 second
++                if (this.keepAlivePending && !this.processedDisconnect && keepAlives.size() * 1000L >= KEEPALIVE_LIMIT) {
++                    this.disconnect(ServerCommonPacketListenerImpl.TIMEOUT_DISCONNECTION_MESSAGE, org.bukkit.event.player.PlayerKickEvent.Cause.TIMEOUT);
++                } else if (this.checkIfClosed(currentTime)) {
++                    this.keepAlivePending = true;
++                    this.keepAliveTime = currentTime; // hijack this field for 1 second intervals
++                    this.keepAlives.add(currentTime); // currentTime is ID
++                    this.send(new ClientboundKeepAlivePacket(currentTime));
++                }
++            }
++        } else
++        // Abomination end
+         if (!this.isSingleplayerOwner() && elapsedTime >= 15000L) { // Paper - use vanilla's 15000L between keep alive packets
+             if (this.keepAlivePending && !this.processedDisconnect && elapsedTime >= KEEPALIVE_LIMIT) { // Paper - check keepalive limit, don't fire if already disconnected
+                 this.disconnect(ServerCommonPacketListenerImpl.TIMEOUT_DISCONNECTION_MESSAGE, PlayerKickEvent.Cause.TIMEOUT); // Paper - kick event cause

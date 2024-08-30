@@ -1,0 +1,22 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 8 Aug 2024 15:22:47 +0200
+Subject: [PATCH] Optimize mob spawners for high player counts
+
+
+diff --git a/src/main/java/net/minecraft/world/level/EntityGetter.java b/src/main/java/net/minecraft/world/level/EntityGetter.java
+index 95938efe2282a024d9d428dedd16cbe127d3ffed..f8435c25c3fe740c95fb8d4c8ce868fece5151de 100644
+--- a/src/main/java/net/minecraft/world/level/EntityGetter.java
++++ b/src/main/java/net/minecraft/world/level/EntityGetter.java
+@@ -180,9 +180,9 @@ public interface EntityGetter extends ca.spottedleaf.moonrise.patches.chunk_syst
+     // Paper start - Affects Spawning API
+     default boolean hasNearbyAlivePlayerThatAffectsSpawning(double x, double y, double z, double range) {
+         for (Player player : this.getLocalPlayers()) { // Folia - region threading
+-            if (EntitySelector.PLAYER_AFFECTS_SPAWNING.test(player)) { // combines NO_SPECTATORS and LIVING_ENTITY_STILL_ALIVE with an "affects spawning" check
++            if (true || EntitySelector.PLAYER_AFFECTS_SPAWNING.test(player)) { // combines NO_SPECTATORS and LIVING_ENTITY_STILL_ALIVE with an "affects spawning" check // Abomination - optimize
+                 double distanceSqr = player.distanceToSqr(x, y, z);
+-                if (range < 0.0D || distanceSqr < range * range) {
++                if ((range < 0.0D || distanceSqr < range * range) && EntitySelector.PLAYER_AFFECTS_SPAWNING.test(player)) { // Abomination - optimize
+                     return true;
+                 }
+             }
