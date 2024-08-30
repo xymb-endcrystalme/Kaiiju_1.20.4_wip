@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Fri, 9 Aug 2024 01:00:46 +0200
+Subject: [PATCH] Optimization: Experimental - skip connection.contains
+
+It's O(n^2) where n is a player count. And it's executed every tick. Gonna lag at thousands.
+
+diff --git a/src/main/java/abomination/config/Experimental.java b/src/main/java/abomination/config/Experimental.java
+index 9003f5aa67cec38d6a2dc5a5907861bb25c14b35..662598fdbafdee90154bd44b142d33c1e6a02179 100644
+--- a/src/main/java/abomination/config/Experimental.java
++++ b/src/main/java/abomination/config/Experimental.java
+@@ -1,4 +1,5 @@
+ package abomination.config;
+ 
+ public class Experimental {
++    public static boolean skipConnectionContains = false;
+ }
+diff --git a/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java b/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
+index d32acb517f813ba005742c6803ed11a52963b371..d72dcd9c992d3868d91215e67c7f7b6d597ab315 100644
+--- a/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
++++ b/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
+@@ -503,7 +503,7 @@ public final class RegionizedWorldData {
+                 cleanUpConnection(conn);
+                 continue;
+             }
+-            if (!this.connections.contains(conn)) {
++            if (!abomination.config.Experimental.skipConnectionContains && !this.connections.contains(conn)) { // Abomination
+                 // removed by connection tick?
+                 continue;
+             }

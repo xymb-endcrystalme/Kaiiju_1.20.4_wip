@@ -1,0 +1,41 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 8 Aug 2024 15:51:30 +0200
+Subject: [PATCH] Optimization: tickBlockEntities - don't initialize toRemove
+ every tick
+
+
+diff --git a/src/main/java/net/minecraft/world/level/Level.java b/src/main/java/net/minecraft/world/level/Level.java
+index 4bb14874912557008fab7361754f2d2eb98fc5aa..fce044c2cc246517bf0a2589ef800ab88309054d 100644
+--- a/src/main/java/net/minecraft/world/level/Level.java
++++ b/src/main/java/net/minecraft/world/level/Level.java
+@@ -1434,13 +1434,18 @@ public abstract class Level implements LevelAccessor, AutoCloseable, ca.spottedl
+         int tickedEntities = 0; // Paper - rewrite chunk system
+ 
+         int tilesThisCycle = 0;
+-        var toRemove = new it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<TickingBlockEntity>(); // Paper - Fix MC-117075; use removeAll
+-        toRemove.add(null); // Paper - Fix MC-117075
++        it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<TickingBlockEntity> toRemove = null; // Abomination - lazy initialization
+         for (int i = 0; i < blockEntityTickers.size(); i++) { // Paper - Disable tick limiters // Folia - regionised ticking
+             TickingBlockEntity tickingblockentity = (TickingBlockEntity) blockEntityTickers.get(i); // Folia - regionised ticking
+             // Spigot end
+ 
+             if (tickingblockentity.isRemoved()) {
++                // Abomination start
++                if (toRemove == null) {
++                    toRemove = new it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet<TickingBlockEntity>(); // Paper - use removeAll
++                    toRemove.add(null);
++                }
++                // Abomination end
+                 // Spigot start
+                 tilesThisCycle--;
+                 toRemove.add(tickingblockentity); // Paper - Fix MC-117075; use removeAll
+@@ -1454,7 +1459,7 @@ public abstract class Level implements LevelAccessor, AutoCloseable, ca.spottedl
+                 // Paper end - rewrite chunk system
+             }
+         }
+-        blockEntityTickers.removeAll(toRemove); // Paper - Fix MC-117075 // Folia - regionised ticking
++        if (toRemove != null) blockEntityTickers.removeAll(toRemove); // Paper - Fix MC-117075 // Folia - regionised ticking // Abomination
+         } finally { profiler.stopTimer(ca.spottedleaf.leafprofiler.LProfilerRegistry.TILE_ENTITY_TICK); } // Folia - profiler
+ 
+         this.timings.tileEntityTick.stopTiming(); // Spigot

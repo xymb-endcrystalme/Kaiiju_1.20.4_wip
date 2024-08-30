@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Fri, 9 Aug 2024 04:51:20 +0200
+Subject: [PATCH] Optimization: Disable player stats
+
+
+diff --git a/src/main/java/abomination/config/Performance.java b/src/main/java/abomination/config/Performance.java
+index 5031f1f6f6330116a7de72adb9582cb8a6fb215c..26f201cf752e0832ef85474ce0a67846e1362b79 100644
+--- a/src/main/java/abomination/config/Performance.java
++++ b/src/main/java/abomination/config/Performance.java
+@@ -3,4 +3,5 @@ package abomination.config;
+ public class Performance {
+     public static boolean enableEntityThrottling = false;
+     public static boolean disableDolphinSwimToTreasure = false;
++    public static boolean disablePlayerStats = false;
+ }
+diff --git a/src/main/java/net/minecraft/server/level/ServerPlayer.java b/src/main/java/net/minecraft/server/level/ServerPlayer.java
+index d681ec617590a3718f926cd5a9749952d5ac52bd..878e4a321de3168d0ed1eea22a0444ad5a4527b1 100644
+--- a/src/main/java/net/minecraft/server/level/ServerPlayer.java
++++ b/src/main/java/net/minecraft/server/level/ServerPlayer.java
+@@ -2408,6 +2408,7 @@ public class ServerPlayer extends net.minecraft.world.entity.player.Player imple
+ 
+     @Override
+     public void awardStat(Stat<?> stat, int amount) {
++        if (abomination.config.Performance.disablePlayerStats) return; // Abomination
+         this.stats.increment(this, stat, amount);
+         this.level().getCraftServer().getScoreboardManager().forAllObjectives(stat, this, (scoreaccess) -> {
+             scoreaccess.add(amount);

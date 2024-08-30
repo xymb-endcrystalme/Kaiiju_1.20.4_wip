@@ -1,0 +1,60 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 8 Aug 2024 08:28:50 +0200
+Subject: [PATCH] Intentionally crash on broken symlink to prevent data loss
+
+
+diff --git a/src/main/java/abomination/config/RegionFile.java b/src/main/java/abomination/config/RegionFile.java
+index a58a164e507c3c9f3f47aea62d8b9005a7ebb41b..925516d4eb775236f28dddd26f829508006c9c1b 100644
+--- a/src/main/java/abomination/config/RegionFile.java
++++ b/src/main/java/abomination/config/RegionFile.java
+@@ -3,6 +3,7 @@ package abomination.config;
+ public class RegionFile {
+     public static String type = "mca";
+     public static int linearCompressionLevel = 1;
++    public static boolean intentionallyCrashOnBrokenSymlink = true;
+ 
+     private static Boolean linear = null;
+ 
+diff --git a/src/main/java/net/minecraft/world/level/chunk/storage/RegionFileStorage.java b/src/main/java/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
+index 81c42ea0f64cc12f28495a9e4e326c4b4afef40c..eac77c2ca9584691942b2fa591df3a2d16288aa2 100644
+--- a/src/main/java/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
++++ b/src/main/java/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
+@@ -90,6 +90,8 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+ 
+         final Path regionPath = this.folder.resolve(getRegionFileName(chunkX, chunkZ));
+ 
++        guardAgainstBrokenSymlinks(regionPath); // Abomination
++
+         if (!java.nio.file.Files.exists(regionPath)) {
+             this.markNonExisting(key);
+             return null;
+@@ -144,6 +146,19 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+         this.isChunkData = isChunkDataFolder(this.folder); // Paper - recalculate region file headers
+     }
+ 
++    // Abomination start
++    private void guardAgainstBrokenSymlinks(Path path) throws IOException {
++        if (!abomination.config.RegionFile.intentionallyCrashOnBrokenSymlink) return;
++        if (!java.nio.file.Files.isSymbolicLink(path)) return;
++        Path link = java.nio.file.Files.readSymbolicLink(path);
++        if (!java.nio.file.Files.exists(link) || !java.nio.file.Files.isReadable(link)) {
++            org.apache.logging.log4j.LogManager.getLogger().fatal("Region file " + path + " is a broken symbolic link, intentionally crashing to prevent data loss: " + path.toString());
++            net.minecraft.server.MinecraftServer.getServer().halt(false);
++            throw new IOException("Region file " + path + " is a broken symbolic link, intentionally crashing to prevent data loss: " + path.toString());
++        }
++    }
++    // Abomination end
++
+     public RegionFile getRegionFile(ChunkPos chunkcoordintpair, boolean existingOnly) throws IOException { // CraftBukkit // Paper - public
+         // Paper start - rewrite chunk system
+         if (existingOnly) {
+@@ -167,6 +182,8 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+ 
+             FileUtil.createDirectoriesSafe(this.folder);
+ 
++            guardAgainstBrokenSymlinks(regionPath); // Abomination
++
+             ret = new RegionFile(this.info, regionPath, this.folder, this.sync);
+ 
+             this.regionCache.putAndMoveToFirst(key, ret);
