@@ -44,3 +44,8 @@ TODO
 ./gradlew applyPatches
 ./gradlew createReobfBundlerJar
 ```
+
+### Unit tests:
+```
+./gradlew :abomination-server:test --tests "abomination.*"
+```
