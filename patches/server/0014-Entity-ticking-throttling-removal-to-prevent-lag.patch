@@ -1,0 +1,409 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 8 Aug 2024 09:19:37 +0200
+Subject: [PATCH] Entity ticking throttling & removal to prevent lag
+
+
+diff --git a/build.gradle.kts b/build.gradle.kts
+index aa429733414b70726832ff5f8c75ac377469bcf8..715b4bfd0948697bcc4ad60f2cf28afe9bed8917 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -70,6 +70,7 @@ dependencies {
+     implementation("com.github.luben:zstd-jni:1.5.4-1")
+     implementation("org.lz4:lz4-java:1.8.0")
+     implementation("net.openhft:zero-allocation-hashing:0.16")
++    implementation("io.github.classgraph:classgraph:4.8.158")
+     // Abomination end
+ }
+ 
+diff --git a/src/main/java/abomination/AbominationCommand.java b/src/main/java/abomination/AbominationCommand.java
+index 9fe4ac3bfb69fc626ba48208e6f629bcd875cd78..d19d4edc57a35f5105f10d3caff49d788da1ec77 100644
+--- a/src/main/java/abomination/AbominationCommand.java
++++ b/src/main/java/abomination/AbominationCommand.java
+@@ -41,6 +41,7 @@ public class AbominationCommand extends Command {
+         if (args[0].equalsIgnoreCase("reload")) {
+             Command.broadcastCommandMessage(sender, ChatColor.RED + "Be careful, this command works only partially. Don't use it if you don't know what you're doing!");
+             abomination.AbominationConfiguration.reload();
++            abomination.EntityLimits.reload(new java.io.File("abomination/entity-limits.yml"));
+         } else {
+             sender.sendMessage(ChatColor.RED + "Usage: " + usageMessage);
+             return false;
+diff --git a/src/main/java/abomination/EntityLimits.java b/src/main/java/abomination/EntityLimits.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..91178ae9552c8a702e61486dfa026f7d4c8b506b
+--- /dev/null
++++ b/src/main/java/abomination/EntityLimits.java
+@@ -0,0 +1,208 @@
++package abomination;
++
++import java.io.File;
++import java.io.IOException;
++import java.util.Map;
++import java.util.HashMap;
++import java.util.logging.Level;
++
++import com.google.common.base.Throwables;
++import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
++import io.github.classgraph.ClassGraph;
++import io.github.classgraph.ClassInfo;
++import io.github.classgraph.ScanResult;
++import org.slf4j.Logger;
++
++import com.mojang.logging.LogUtils;
++import net.minecraft.world.entity.Entity;
++import org.bukkit.Bukkit;
++import org.bukkit.configuration.InvalidConfigurationException;
++import org.bukkit.configuration.file.YamlConfiguration;
++
++@SuppressWarnings("unused")
++public class EntityLimits {
++    private static final Logger LOGGER = LogUtils.getLogger();
++
++    private static final Map<String, String> mappings = new HashMap<>() {{
++        put("AbstractArrow", "Arrow");
++        put("AbstractChestedHorse", "HorseChestedAbstract");
++        put("AbstractFish", "Fish");
++        put("AbstractGolem", "Golem");
++        put("AbstractHorse", "HorseAbstract");
++        put("AbstractHurtingProjectile", "Projectile");
++        put("AbstractIllager", "IllagerAbstract");
++        put("AbstractMinecart", "MinecartAbstract");
++        put("AbstractMinecartContainer", "MinecartContainer");
++        put("AbstractPiglin", "PiglinAbstract");
++        put("AbstractSchoolingFish", "FishSchool");
++        put("AbstractSkeleton", "SkeletonAbstract");
++        put("AbstractVillager", "VillagerAbstract");
++        put("AbstractWindCharge", "WindCharge");
++        put("AgeableMob", "Ageable");
++        put("AmbientCreature", "Ambient");
++        put("Donkey", "HorseDonkey");
++        put("ElderGuardian", "GuardianElder");
++        put("EndCrystal", "EnderCrystal");
++        put("EnderDragonPart", "ComplexPart");
++        put("EnderMan", "Enderman");
++        put("EyeOfEnder", "EnderSignal");
++        put("FallingBlockEntity", "FallingBlock");
++        put("FireworkRocketEntity", "Fireworks");
++        put("FlyingMob", "Flying");
++        put("Giant", "GiantZombie");
++        put("HangingEntity", "Hanging");
++        put("Husk", "ZombieHusk");
++        put("Illusioner", "IllagerIllusioner");
++        put("ItemEntity", "Item");
++        put("LeashFenceKnotEntity", "Leash");
++        put("LightningBolt", "Lightning");
++        put("LivingEntity", "Living");
++        put("Minecart", "MinecartRideable");
++        put("MinecartSpawner", "MinecartMobSpawner");
++        put("Mob", "Insentient");
++        put("Mule", "HorseMule");
++        put("PathfinderMob", "Creature");
++        put("PatrollingMonster", "MonsterPatrolling");
++        put("Player", "Human");
++        put("PrimedTnt", "TNTPrimed");
++        put("Pufferfish", "PufferFish");
++        put("ShoulderRidingEntity", "Perchable");
++        put("SkeletonHorse", "HorseSkeleton");
++        put("SnowGolem", "Snowman");
++        put("SpectralArrow", "TippedArrow");
++        put("SpellcasterIllager", "IllagerWizard");
++        put("Stray", "SkeletonStray");
++        put("TamableAnimal", "TameableAnimal");
++        put("ThrowableItemProjectile", "ProjectileThrowable");
++        put("ThrowableProjectile", "IProjectile");
++        put("ThrownEgg", "Egg");
++        put("ThrownEnderpearl", "EnderPearl");
++        put("ThrownExperienceBottle", "ThrownExpBottle");
++        put("ThrownPotion", "Potion");
++        put("TraderLlama", "LlamaTrader");
++        put("WanderingTrader", "VillagerTrader");
++        put("WitherBoss", "Wither");
++        put("WitherSkeleton", "SkeletonWither");
++        put("ZombieHorse", "HorseZombie");
++        put("ZombifiedPiglin", "PigZombie");
++    }};
++
++    private static String convertMapping(String original) {
++        return mappings.getOrDefault(original, original);
++    }
++
++    protected static final String HEADER =
++        "Per region entity limits for Abomination.\n"
++        + "If there are more of particular entity type in a region than limit, entity ticking will be throttled.\n"
++        + "Example: for Wither limit 100 & 300 Withers in a region -> 100 Withers tick every tick & every Wither ticks every 3 ticks.\n"
++        + "Available entities: GlowSquid, Ambient, Bat, Animal, Bee, Cat, Chicken, Cod, Cow, Dolphin, Fish, FishSchool, Fox, Golem, IronGolem, "
++        + "MushroomCow, Ocelot, Panda, Parrot, Perchable, Pig, PolarBear, PufferFish, Rabbit, Salmon, Sheep, Snowman, Squid, TropicalFish, Turtle, "
++        + "WaterAnimal, Wolf, Allay, Axolotl, Camel, Frog, Tadpole, Goat, Horse, HorseAbstract, HorseChestedAbstract, HorseDonkey, HorseMule, "
++        + "HorseSkeleton, HorseZombie, Llama, LlamaTrader, Sniffer, EnderCrystal, EnderDragon, Wither, ArmorStand, Hanging, ItemFrame, Leash, "
++        + "Painting, GlowItemFrame, FallingBlock, Item, TNTPrimed, Blaze, CaveSpider, Creeper, Drowned, Enderman, Endermite, Evoker, Ghast, "
++        + "GiantZombie, Guardian, GuardianElder, IllagerAbstract, IllagerIllusioner, IllagerWizard, MagmaCube, Monster, MonsterPatrolling, Phantom, "
++        + "PigZombie, Pillager, Ravager, Shulker, Silverfish, Skeleton, SkeletonAbstract, SkeletonStray, SkeletonWither, Slime, Spider, Strider, Vex, "
++        + "Vindicator, Witch, Zoglin, Zombie, ZombieHusk, ZombieVillager, Hoglin, Piglin, PiglinAbstract, PiglinBrute, Warden, Villager, "
++        + "VillagerTrader, Arrow, DragonFireball, Egg, EnderPearl, EnderSignal, EvokerFangs, Fireball, FireballFireball, Fireworks, FishingHook, "
++        + "LargeFireball, LlamaSpit, Potion, Projectile, ProjectileThrowable, ShulkerBullet, SmallFireball, Snowball, SpectralArrow, ThrownExpBottle, "
++        + "ThrownTrident, TippedArrow, WitherSkull, Raider, ChestBoat, Boat, MinecartAbstract, MinecartChest, MinecartCommandBlock, MinecartContainer, "
++        + "MinecartFurnace, MinecartHopper, MinecartMobSpawner, MinecartRideable, MinecartTNT\n";
++    protected static File ENTITY_LIMITS_FILE;
++    public static YamlConfiguration entityLimitsConfig;
++
++    protected static Map<Class<? extends Entity>, EntityLimit> entityLimits;
++
++    static final String ENTITY_PREFIX = "Entity";
++
++    public static void init(File entityLimitsFile) {
++        init(entityLimitsFile, true);
++    }
++
++    public static void reload(File entityLimitsFile) {
++        init(entityLimitsFile, false);
++    }
++
++    private static void init(File entityLimitsFile, boolean setup) {
++        ENTITY_LIMITS_FILE = entityLimitsFile;
++        entityLimitsConfig = new YamlConfiguration();
++
++        if (entityLimitsFile.exists()) {
++            try {
++                entityLimitsConfig.load(ENTITY_LIMITS_FILE);
++            } catch (InvalidConfigurationException ex) {
++                Bukkit.getLogger().log(Level.SEVERE, "Could not load entity-limits.yml, please correct your syntax errors", ex);
++                throw Throwables.propagate(ex);
++            } catch (IOException ignore) {}
++        } else {
++            if (setup) {
++                entityLimitsConfig.options().header(HEADER);
++                entityLimitsConfig.options().copyDefaults(true);
++                entityLimitsConfig.set("Wither.limit", 1000);
++                entityLimitsConfig.set("Wither.removal", 5000);
++                entityLimitsConfig.set("Axolotl.limit", 1000);
++                entityLimitsConfig.set("Axolotl.removal", 5000);
++                try {
++                    entityLimitsConfig.save(ENTITY_LIMITS_FILE);
++                } catch (IOException ex) {
++                    Bukkit.getLogger().log(Level.SEVERE, "Could not save " + ENTITY_LIMITS_FILE, ex);
++                }
++            }
++        }
++
++        entityLimits = new Object2ObjectOpenHashMap<>();
++        try (ScanResult scanResult = new ClassGraph().enableAllInfo().acceptPackages("net.minecraft.world.entity").scan()) {
++            Map<String, ClassInfo> entityClasses = new HashMap<>();
++            for (ClassInfo classInfo : scanResult.getAllClasses()) {
++                Class<?> entityClass = Class.forName(classInfo.getName());
++                if (Entity.class.isAssignableFrom(entityClass)) {
++                    String entityName = extractEntityName(entityClass.getSimpleName());
++                    entityClasses.put(entityName, classInfo);
++                }
++            }
++
++            for (String key : entityLimitsConfig.getKeys(false)) {
++                if (!entityClasses.containsKey(key)) {
++                    LOGGER.error("Unknown entity '" + key + "' in entity-limits.yml, skipping");
++                    continue;
++                }
++                int limit = entityLimitsConfig.getInt(key + ".limit");
++                int removal = entityLimitsConfig.getInt(key + ".removal");
++
++                if (limit < 1) {
++                    LOGGER.error(key + " has a limit less than the minimum of 1, ignoring");
++                    continue;
++                }
++                if (removal <= limit && removal != -1) {
++                    LOGGER.error(key + " has a removal limit that is less than or equal to its limit, setting removal to limit * 10");
++                    removal = limit * 10;
++                }
++
++                entityLimits.put((Class<? extends Entity>) Class.forName(entityClasses.get(key).getName()), new EntityLimit(limit, removal));
++            }
++        } catch (ClassNotFoundException e) {
++            e.printStackTrace();
++        }
++    }
++
++    public static EntityLimit getEntityLimit(Entity entity) {
++        return entityLimits.get(entity.getClass());
++    }
++
++    private static String extractEntityName(String input) {
++        int prefixLength = ENTITY_PREFIX.length();
++        input = convertMapping(input);
++
++        if (input.length() <= prefixLength || !input.startsWith(ENTITY_PREFIX)) {
++            return input;
++        } else {
++            return input.substring(prefixLength);
++        }
++    }
++
++    public record EntityLimit(int limit, int removal) {
++        @Override
++        public String toString() {
++            return "EntityLimit{limit=" + limit + ", removal=" + removal + "}";
++        }
++    }
++}
+diff --git a/src/main/java/abomination/EntityThrottler.java b/src/main/java/abomination/EntityThrottler.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..102c5dc4d36c521c9acd0b6e73ef7cc6538ca0fb
+--- /dev/null
++++ b/src/main/java/abomination/EntityThrottler.java
+@@ -0,0 +1,84 @@
++package abomination;
++
++import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
++import net.minecraft.world.entity.Entity;
++import io.papermc.paper.threadedregions.RegionizedWorldData;
++
++public class EntityThrottler {
++    private static class TickInfo {
++        int currentTick;
++        int continueFrom;
++        int toTick;
++        int toRemove;
++    }
++
++    public static class EntityThrottlerReturn {
++        public boolean skip;
++        public boolean remove;
++    }
++
++    private final Object2ObjectOpenHashMap<EntityLimits.EntityLimit, TickInfo> entityLimitTickInfoMap = new Object2ObjectOpenHashMap<>();
++
++    public void tickLimiterStart() {
++        for (TickInfo tickInfo : entityLimitTickInfoMap.values()) {
++            tickInfo.currentTick = 0;
++        }
++    }
++
++    public EntityThrottlerReturn tickLimiterShouldSkip(Entity entity) {
++        EntityThrottlerReturn retVal = new EntityThrottlerReturn();
++        if (entity.isRemoved()) return retVal;
++        EntityLimits.EntityLimit entityLimit = EntityLimits.getEntityLimit(entity);
++
++        if (entityLimit != null) {
++            TickInfo tickInfo = entityLimitTickInfoMap.computeIfAbsent(entityLimit, el -> {
++                TickInfo newTickInfo = new TickInfo();
++                newTickInfo.toTick = entityLimit.limit();
++                return newTickInfo;
++            });
++
++            tickInfo.currentTick++;
++            if (tickInfo.currentTick <= tickInfo.toRemove && entityLimit.removal() > 0) {
++                retVal.skip = false;
++                retVal.remove = true;
++                return retVal;
++            }
++
++            if (tickInfo.currentTick < tickInfo.continueFrom) {
++                retVal.skip = true;
++                return retVal;
++            }
++            if (tickInfo.currentTick - tickInfo.continueFrom < tickInfo.toTick) {
++                retVal.skip = false;
++                return retVal;
++            }
++            retVal.skip = true;
++            return retVal;
++        } else {
++            retVal.skip = false;
++            return retVal;
++        }
++    }
++
++    public void tickLimiterFinish(RegionizedWorldData regionizedWorldData) {
++        for (var entry : entityLimitTickInfoMap.entrySet()) {
++            EntityLimits.EntityLimit entityLimit = entry.getKey();
++            TickInfo tickInfo = entry.getValue();
++
++            int additionals = 0;
++            int nextContinueFrom = tickInfo.continueFrom + tickInfo.toTick;
++            if (nextContinueFrom >= tickInfo.currentTick) {
++                additionals = entityLimit.limit() - (tickInfo.currentTick - tickInfo.continueFrom);
++                nextContinueFrom = 0;
++            }
++            tickInfo.continueFrom = nextContinueFrom;
++            tickInfo.toTick = entityLimit.limit() + additionals;
++
++            if (tickInfo.toRemove == 0 && tickInfo.currentTick > entityLimit.removal()) {
++                tickInfo.toRemove = tickInfo.currentTick - entityLimit.removal();
++            } else if (tickInfo.toRemove != 0) {
++                tickInfo.toRemove = 0;
++            }
++        }
++    }
++}
+diff --git a/src/main/java/abomination/config/Performance.java b/src/main/java/abomination/config/Performance.java
+index d6c714371b7f03875c14daeb8b1719b421e28f19..90476c45ef24c927f710a882e9381a7c2017c220 100644
+--- a/src/main/java/abomination/config/Performance.java
++++ b/src/main/java/abomination/config/Performance.java
+@@ -1,4 +1,5 @@
+ package abomination.config;
+ 
+ public class Performance {
++    public static boolean enableEntityThrottling = false;
+ }
+diff --git a/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java b/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
+index 5dc4c8a5b896f519be5414d4a53a71144c225324..d32acb517f813ba005742c6803ed11a52963b371 100644
+--- a/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
++++ b/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
+@@ -345,6 +345,7 @@ public final class RegionizedWorldData {
+     private final IteratorSafeOrderedReferenceSet<Mob> navigatingMobs = new IteratorSafeOrderedReferenceSet<>();
+     public final ReferenceList<Entity> trackerEntities = new ReferenceList<>(EMPTY_ENTITY_ARRAY); // Moonrise - entity tracker
+     public final ReferenceList<Entity> trackerUnloadedEntities = new ReferenceList<>(EMPTY_ENTITY_ARRAY); // Moonrise - entity tracker
++    public final abomination.EntityThrottler entityThrottler = new abomination.EntityThrottler(); // Abomination
+ 
+     // block ticking
+     private final ObjectLinkedOpenHashSet<BlockEventData> blockEvents = new ObjectLinkedOpenHashSet<>();
+diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+index c1d997a28fc4e8ba50c44764ab5e634300a9b734..fc390921434d5d78e950dea8f3f7a73b672b5e76 100644
+--- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
++++ b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
+@@ -240,6 +240,14 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
+         com.destroystokyo.paper.Metrics.PaperMetrics.startMetrics(); // Paper - start metrics
+         com.destroystokyo.paper.VersionHistoryManager.INSTANCE.getClass(); // Paper - load version history now
+ 
++        // Abomination start
++        try {
++            abomination.EntityLimits.init(new java.io.File("abomination/entity-limits.yml"));
++        } catch (Exception e) {
++            DedicatedServer.LOGGER.error("Unable to load entity limits", e);
++            return false;
++        }
++        // Abomination stop
+         MinecraftServer.getServer().server.getCommandMap().register("abomination", "Abomination", new abomination.AbominationCommand("abomination")); // Abomination
+ 
+         this.setPvpAllowed(dedicatedserverproperties.pvp);
+diff --git a/src/main/java/net/minecraft/server/level/ServerLevel.java b/src/main/java/net/minecraft/server/level/ServerLevel.java
+index 0166d6bd686d68ffdcc42e908b0d1aa41a3bffdf..7c2b8c066ba40ea84f2f4a2e34ff77ae26ee311e 100644
+--- a/src/main/java/net/minecraft/server/level/ServerLevel.java
++++ b/src/main/java/net/minecraft/server/level/ServerLevel.java
+@@ -801,6 +801,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ca.spottedleaf.
+                 } finally { profiler.stopTimer(ca.spottedleaf.leafprofiler.LProfilerRegistry.DRAGON_FIGHT_TICK); } // Folia - profiler
+             }
+ 
++            if (abomination.config.Performance.enableEntityThrottling) regionizedWorldData.entityThrottler.tickLimiterStart(); // Abomination
+             org.spigotmc.ActivationRange.activateEntities(this); // Spigot
+             this.timings.entityTick.startTiming(); // Spigot
+             profiler.startTimer(ca.spottedleaf.leafprofiler.LProfilerRegistry.ENTITY_TICK); try { // Folia - profiler
+@@ -824,6 +825,13 @@ public class ServerLevel extends Level implements WorldGenLevel, ca.spottedleaf.
+                                 entity.stopRiding();
+                             }
+ 
++                            // Abomination start
++                            if (abomination.config.Performance.enableEntityThrottling) {
++                                abomination.EntityThrottler.EntityThrottlerReturn throttle = regionizedWorldData.entityThrottler.tickLimiterShouldSkip(entity);
++                                if (throttle.remove) entity.remove(Entity.RemovalReason.DISCARDED);
++                                if (throttle.skip) return;
++                            }
++                            // Abomination end
+                             gameprofilerfiller.push("tick");
+                             this.guardEntityTick(this::tickNonPassenger, entity);
+                             gameprofilerfiller.pop();
+@@ -832,6 +840,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ca.spottedleaf.
+                 }
+             });
+             } finally { profiler.stopTimer(ca.spottedleaf.leafprofiler.LProfilerRegistry.ENTITY_TICK); } // Folia - profiler
++            if (abomination.config.Performance.enableEntityThrottling) regionizedWorldData.entityThrottler.tickLimiterFinish(regionizedWorldData); // Abomination
+             this.timings.entityTick.stopTiming(); // Spigot
+             this.timings.tickEntities.stopTiming(); // Spigot
+             gameprofilerfiller.pop();

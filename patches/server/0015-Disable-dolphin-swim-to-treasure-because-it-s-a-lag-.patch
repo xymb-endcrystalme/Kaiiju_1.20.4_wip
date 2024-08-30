@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 8 Aug 2024 15:40:53 +0200
+Subject: [PATCH] Disable dolphin swim to treasure because it's a lag machine
+
+
+diff --git a/src/main/java/abomination/config/Performance.java b/src/main/java/abomination/config/Performance.java
+index 90476c45ef24c927f710a882e9381a7c2017c220..5031f1f6f6330116a7de72adb9582cb8a6fb215c 100644
+--- a/src/main/java/abomination/config/Performance.java
++++ b/src/main/java/abomination/config/Performance.java
+@@ -2,4 +2,5 @@ package abomination.config;
+ 
+ public class Performance {
+     public static boolean enableEntityThrottling = false;
++    public static boolean disableDolphinSwimToTreasure = false;
+ }
+diff --git a/src/main/java/net/minecraft/world/entity/animal/Dolphin.java b/src/main/java/net/minecraft/world/entity/animal/Dolphin.java
+index da45cc62985f8b67cdfeffc21cb33837db673555..9c6cf6cd03c0d2e24d81eb1f2d34cfffac891017 100644
+--- a/src/main/java/net/minecraft/world/entity/animal/Dolphin.java
++++ b/src/main/java/net/minecraft/world/entity/animal/Dolphin.java
+@@ -158,7 +158,7 @@ public class Dolphin extends WaterAnimal {
+     protected void registerGoals() {
+         this.goalSelector.addGoal(0, new BreathAirGoal(this));
+         this.goalSelector.addGoal(0, new TryFindWaterGoal(this));
+-        this.goalSelector.addGoal(1, new Dolphin.DolphinSwimToTreasureGoal(this));
++        if (!abomination.config.Performance.disableDolphinSwimToTreasure) this.goalSelector.addGoal(1, new Dolphin.DolphinSwimToTreasureGoal(this));
+         this.goalSelector.addGoal(2, new Dolphin.DolphinSwimWithPlayerGoal(this, 4.0D));
+         this.goalSelector.addGoal(4, new RandomSwimmingGoal(this, 1.0D, 10));
+         this.goalSelector.addGoal(4, new RandomLookAroundGoal(this));

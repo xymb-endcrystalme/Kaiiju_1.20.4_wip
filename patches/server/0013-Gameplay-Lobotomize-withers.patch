@@ -1,0 +1,35 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Fri, 9 Aug 2024 06:27:51 +0200
+Subject: [PATCH] Gameplay: Lobotomize withers
+
+
+diff --git a/src/main/java/abomination/config/Gameplay.java b/src/main/java/abomination/config/Gameplay.java
+index f4af8e01fe3208361e7ab79d8e0899c2409be314..73f84469d4a93370a7cc64b100d443f3d2236dcc 100644
+--- a/src/main/java/abomination/config/Gameplay.java
++++ b/src/main/java/abomination/config/Gameplay.java
+@@ -2,4 +2,5 @@ package abomination.config;
+ 
+ public class Gameplay {
+     public static boolean shulkerBoxItemDropContentsWhenDestroyed = true;
++    public static boolean lobotomizeWithers = false; // Make withers behave like in 1.17
+ }
+diff --git a/src/main/java/net/minecraft/world/entity/boss/wither/WitherBoss.java b/src/main/java/net/minecraft/world/entity/boss/wither/WitherBoss.java
+index d3b4d492aee380dc17f4232d90eaae4f07bb9f86..d1843e710bc60e69d2493e6590a6bfdf2c4467ff 100644
+--- a/src/main/java/net/minecraft/world/entity/boss/wither/WitherBoss.java
++++ b/src/main/java/net/minecraft/world/entity/boss/wither/WitherBoss.java
+@@ -120,7 +120,13 @@ public class WitherBoss extends Monster implements PowerableMob, RangedAttackMob
+         this.goalSelector.addGoal(6, new LookAtPlayerGoal(this, Player.class, 8.0F));
+         this.goalSelector.addGoal(7, new RandomLookAroundGoal(this));
+         this.targetSelector.addGoal(1, new HurtByTargetGoal(this, new Class[0]));
+-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, LivingEntity.class, 0, false, false, WitherBoss.LIVING_ENTITY_SELECTOR));
++        // Abomination start
++        if (abomination.config.Gameplay.lobotomizeWithers) {
++            this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, net.minecraft.world.entity.Mob.class, 0, false, false, WitherBoss.LIVING_ENTITY_SELECTOR));
++        } else {
++            this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, LivingEntity.class, 0, false, false, WitherBoss.LIVING_ENTITY_SELECTOR));
++        }
++        // Abomination end
+     }
+ 
+     @Override
