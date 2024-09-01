@@ -5,7 +5,7 @@ Subject: [PATCH] Rebrand to Abomination
 
 
 diff --git a/build.gradle.kts b/build.gradle.kts
-index f0a90d13a17160cd363d54d494add4f6433b4758..6e79d28e20eb1e2b7c2690439afde7e4d599a22a 100644
+index a663cfec76f4deddb7cf8d2f134bedfa1a3cde66..a9ff88735c6e22f3588277cdc80cb20c24e19fe7 100644
 --- a/build.gradle.kts
 +++ b/build.gradle.kts
 @@ -13,7 +13,7 @@ configurations.named(log4jPlugins.compileClasspathConfigurationName) {
@@ -60,7 +60,7 @@ index cb60d58d4a7556dd896f31d0cd249f860bb3ef84..1dbc453aca378c3bb9d0810b2edd88d3
                  metrics.addCustomChart(new Metrics.DrilldownPie("java_version", () -> {
                      Map<String, Map<String, Integer>> map = new HashMap<>();
 diff --git a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
-index e741201fdbea0dbbc0e42313ebd33368014c9dc4..dc39f085636d5debbd6098f142b8177bc3dbd7b0 100644
+index e741201fdbea0dbbc0e42313ebd33368014c9dc4..673148af5bebaea704c550d474f94c41e71895e8 100644
 --- a/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
 +++ b/src/main/java/io/papermc/paper/ServerBuildInfoImpl.java
 @@ -42,9 +42,9 @@ public record ServerBuildInfoImpl(
@@ -68,13 +68,26 @@ index e741201fdbea0dbbc0e42313ebd33368014c9dc4..dc39f085636d5debbd6098f142b8177b
              getManifestAttribute(manifest, ATTRIBUTE_BRAND_ID)
                  .map(Key::key)
 -                .orElse(Key.key("papermc", "folia")), // Folia
-+                .orElse(Key.key("xymb", "abomination")), // Folia // Abomination
++                .orElse(Key.key("xymb-endcrystalme", "abomination")), // Folia // Abomination
              getManifestAttribute(manifest, ATTRIBUTE_BRAND_NAME)
 -                .orElse("Folia"), // Folia
 +                .orElse("Abomination"), // Folia // Abomination
              SharedConstants.getCurrentVersion().getId(),
              SharedConstants.getCurrentVersion().getName(),
              getManifestAttribute(manifest, ATTRIBUTE_BUILD_NUMBER)
+diff --git a/src/main/java/org/bukkit/craftbukkit/util/Versioning.java b/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
+index e9b6ca3aa25e140467ae866d572483050ea3fa0e..1aec35043723718d97c72cdc4ba283ddf795cf1d 100644
+--- a/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
++++ b/src/main/java/org/bukkit/craftbukkit/util/Versioning.java
+@@ -11,7 +11,7 @@ public final class Versioning {
+     public static String getBukkitVersion() {
+         String result = "Unknown-Version";
+ 
+-        InputStream stream = Bukkit.class.getClassLoader().getResourceAsStream("META-INF/maven/dev.folia/folia-api/pom.properties"); // Folia
++        InputStream stream = Bukkit.class.getClassLoader().getResourceAsStream("META-INF/maven/me.endcrystal.abomination/abomination-api/pom.properties"); // Abomination
+         Properties properties = new Properties();
+ 
+         if (stream != null) {
 diff --git a/src/main/java/org/spigotmc/WatchdogThread.java b/src/main/java/org/spigotmc/WatchdogThread.java
 index f7a4fee9bb25ff256dc2e5ea26bfbceca6a49167..90988b6e16a6b96e5ad7d003be0db747d820fccf 100644
 --- a/src/main/java/org/spigotmc/WatchdogThread.java
