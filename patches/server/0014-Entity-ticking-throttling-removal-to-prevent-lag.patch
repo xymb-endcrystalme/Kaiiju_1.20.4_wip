@@ -343,10 +343,10 @@ index d6c714371b7f03875c14daeb8b1719b421e28f19..90476c45ef24c927f710a882e9381a7c
 +    public static boolean enableEntityThrottling = false;
  }
 diff --git a/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java b/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
-index 5dc4c8a5b896f519be5414d4a53a71144c225324..d32acb517f813ba005742c6803ed11a52963b371 100644
+index cd89a11ff94dfbb9c9e259b85f931bd0d160c06e..ff59bcfb8afaac587a1279902dcf4a88812c855d 100644
 --- a/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
 +++ b/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
-@@ -345,6 +345,7 @@ public final class RegionizedWorldData {
+@@ -336,6 +336,7 @@ public final class RegionizedWorldData {
      private final IteratorSafeOrderedReferenceSet<Mob> navigatingMobs = new IteratorSafeOrderedReferenceSet<>();
      public final ReferenceList<Entity> trackerEntities = new ReferenceList<>(EMPTY_ENTITY_ARRAY); // Moonrise - entity tracker
      public final ReferenceList<Entity> trackerUnloadedEntities = new ReferenceList<>(EMPTY_ENTITY_ARRAY); // Moonrise - entity tracker

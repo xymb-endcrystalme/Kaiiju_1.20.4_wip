@@ -16,10 +16,10 @@ index 9003f5aa67cec38d6a2dc5a5907861bb25c14b35..662598fdbafdee90154bd44b142d33c1
 +    public static boolean skipConnectionContains = false;
  }
 diff --git a/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java b/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
-index d32acb517f813ba005742c6803ed11a52963b371..d72dcd9c992d3868d91215e67c7f7b6d597ab315 100644
+index ff59bcfb8afaac587a1279902dcf4a88812c855d..927d131d36fda4a676e1c12a050e343e12422727 100644
 --- a/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
 +++ b/src/main/java/io/papermc/paper/threadedregions/RegionizedWorldData.java
-@@ -503,7 +503,7 @@ public final class RegionizedWorldData {
+@@ -494,7 +494,7 @@ public final class RegionizedWorldData {
                  cleanUpConnection(conn);
                  continue;
              }

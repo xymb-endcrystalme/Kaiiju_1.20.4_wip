@@ -6,7 +6,7 @@ Subject: [PATCH] Reliability: Thread watchdog
 
 diff --git a/src/main/java/abomination/ThreadStabilityWatchdog.java b/src/main/java/abomination/ThreadStabilityWatchdog.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..d683019ba7158dc8a01b69115f328fe2f18c7dbf
+index 0000000000000000000000000000000000000000..095cd8c477613b13ea5f3abbe7e63a8a1c566cd9
 --- /dev/null
 +++ b/src/main/java/abomination/ThreadStabilityWatchdog.java
 @@ -0,0 +1,96 @@
@@ -37,7 +37,7 @@ index 0000000000000000000000000000000000000000..d683019ba7158dc8a01b69115f328fe2
 +        for (int i = 0 ; i < length ; i++) {
 +            if (threadStamps[i] != 0) {
 +                int elapsed = currentTime - threadStamps[i];
-+                if (elapsed > warningDelay * 10) {
++                if (abomination.config.Reliability.ThreadStabilityWatchdog.justSpamMeMode || elapsed > warningDelay * 10) {
 +                    threadStamps[i] = currentTime;
 +                    LOGGER.info("Abomination: Thread stuck - " + (elapsed / 10) + " seconds stuck");
 +                    TickThread crashedThread = threads[i];
@@ -107,10 +107,10 @@ index 0000000000000000000000000000000000000000..d683019ba7158dc8a01b69115f328fe2
 +    }
 +}
 diff --git a/src/main/java/abomination/config/Reliability.java b/src/main/java/abomination/config/Reliability.java
-index 7c92166683e9f626c5df53058369aa44ab352624..52b89793a6c5178aa0d817e38d9eacfbf981b6a1 100644
+index 7c92166683e9f626c5df53058369aa44ab352624..fdac6283be362ba0a05a146dc3e05cd78d794c24 100644
 --- a/src/main/java/abomination/config/Reliability.java
 +++ b/src/main/java/abomination/config/Reliability.java
-@@ -3,4 +3,9 @@ package abomination.config;
+@@ -3,4 +3,11 @@ package abomination.config;
  public class Reliability {
      public static int saveMapDataEveryXSeconds = 600; // 0 to disable
      public static boolean makeAllPluginEventsSynchronized = false; // Fixes some plugins that claim Folia compatibility, but have multithreading bugs
@@ -118,19 +118,21 @@ index 7c92166683e9f626c5df53058369aa44ab352624..52b89793a6c5178aa0d817e38d9eacfb
 +    public static class ThreadStabilityWatchdog {
 +        public static boolean enabled = true;
 +        public static int warningIntervalInSeconds = 10;
++        public static boolean aggresiveMode = false; // Doesn't mark ticks when the thread is in STATE_IDLE
++        public static boolean justSpamMeMode = false; // Just spam on every seconds
 +    }
  }
 diff --git a/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java b/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java
-index 8197ccb1c4e5878dbd8007b5fb514640765ec8e4..ba1ea38d534bc32fcc3e5f96cd300652a9501e9b 100644
+index 8197ccb1c4e5878dbd8007b5fb514640765ec8e4..7c8fb8f8517c67cfd80003389fd9d32e36f12804 100644
 --- a/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java
 +++ b/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java
 @@ -508,7 +508,9 @@ public class SchedulerThreadPool {
                  switch (startStateType) {
                      case STATE_IDLE: {
                          while (this.state.state == STATE_IDLE) {
-+                            abomination.ThreadStabilityWatchdog.unmarkThread(); // Abomination
++                            if (!abomination.config.Reliability.ThreadStabilityWatchdog.aggresiveMode) abomination.ThreadStabilityWatchdog.unmarkThread(); // Abomination
                              LockSupport.park();
-+                            abomination.ThreadStabilityWatchdog.markThread(); // Abomination
++                            if (!abomination.config.Reliability.ThreadStabilityWatchdog.aggresiveMode) abomination.ThreadStabilityWatchdog.markThread(); // Abomination
                              if (this.scheduler.halted) {
                                  return;
                              }

@@ -37,7 +37,7 @@ If you want to go back to a fork that supports only `.linear v1` don't use Abomi
 | Linear Region File Format v2 - save memory | 0% | ❌
 | Linear Region File Format v2 - crash on unknown features | 0% | ❌
 | Linear v2 feature - world/entity/poi in a single region file | 0% | ❌
-| Packet firewall port from 1.19.4 | 0% | ❌
+| Packet firewall port from SecurityKaiiju 1.19.4 | 0% | ❌
 | NBT deduplication on chunk write | 0% | ❌
 | NBT deduplication on chunk read | 0% | ❌
 | NBT deduplication - Linear v2 feature | 0% | ❌
