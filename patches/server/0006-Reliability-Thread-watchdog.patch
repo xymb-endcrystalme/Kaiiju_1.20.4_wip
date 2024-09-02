@@ -6,10 +6,10 @@ Subject: [PATCH] Reliability: Thread watchdog
 
 diff --git a/src/main/java/abomination/ThreadStabilityWatchdog.java b/src/main/java/abomination/ThreadStabilityWatchdog.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..095cd8c477613b13ea5f3abbe7e63a8a1c566cd9
+index 0000000000000000000000000000000000000000..d5aa2f015e2b4dc2afd920126b698b5eb4b2de4d
 --- /dev/null
 +++ b/src/main/java/abomination/ThreadStabilityWatchdog.java
-@@ -0,0 +1,96 @@
+@@ -0,0 +1,99 @@
 +package abomination;
 +
 +import io.papermc.paper.threadedregions.TickRegionScheduler;
@@ -38,7 +38,7 @@ index 0000000000000000000000000000000000000000..095cd8c477613b13ea5f3abbe7e63a8a
 +            if (threadStamps[i] != 0) {
 +                int elapsed = currentTime - threadStamps[i];
 +                if (abomination.config.Reliability.ThreadStabilityWatchdog.justSpamMeMode || elapsed > warningDelay * 10) {
-+                    threadStamps[i] = currentTime;
++                    if (!abomination.config.Reliability.ThreadStabilityWatchdog.justSpamMeMode) threadStamps[i] = currentTime;
 +                    LOGGER.info("Abomination: Thread stuck - " + (elapsed / 10) + " seconds stuck");
 +                    TickThread crashedThread = threads[i];
 +                    if (crashedThread != null) {
@@ -68,7 +68,10 @@ index 0000000000000000000000000000000000000000..095cd8c477613b13ea5f3abbe7e63a8a
 +                    //LOGGER.info("Thread stability watchdog tick");
 +                    verifyThreads();
 +                    try {
-+                        Thread.sleep(100);
++                        int warningDelay = abomination.config.Reliability.ThreadStabilityWatchdog.warningIntervalInSeconds;
++                        if (warningDelay < 1) warningDelay = 1;
++                        if (abomination.config.Reliability.ThreadStabilityWatchdog.justSpamMeMode) Thread.sleep(1000 * warningDelay);
++                        else Thread.sleep(100);
 +                    } catch (InterruptedException e) {
 +                        Thread.currentThread().interrupt();
 +                    }
