@@ -16,7 +16,7 @@ index 90b54c9f06acd586fd713ec8eb810fb62858207e..7c92166683e9f626c5df53058369aa44
 +    public static boolean makeAllPluginEventsSynchronized = false; // Fixes some plugins that claim Folia compatibility, but have multithreading bugs
  }
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
-index 7ce9ebba8ce304d1f3f21d4f15ee5f3560d7700b..5ef131cdda870f58e09e887ec5a1375d1cf41913 100644
+index 7ce9ebba8ce304d1f3f21d4f15ee5f3560d7700b..1b5ec4e11eaa4ec837ef4c64af48cd3acc379d2b 100644
 --- a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
 +++ b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
 @@ -29,6 +29,7 @@ import java.util.logging.Level;
@@ -27,15 +27,17 @@ index 7ce9ebba8ce304d1f3f21d4f15ee5f3560d7700b..5ef131cdda870f58e09e887ec5a1375d
  
      public PaperEventManager(Server server) {
          this.server = server;
-@@ -51,6 +52,11 @@ class PaperEventManager {
+@@ -51,6 +52,13 @@ class PaperEventManager {
              }
  
              try {
++                // Abomination start
 +                if (abomination.config.Reliability.makeAllPluginEventsSynchronized) {
 +                    synchronized (lock) { // Abomination - never run plugins async
 +                        registration.callEvent(event);
 +                    }
 +                } else
++                // Abomination end
                  registration.callEvent(event);
              } catch (AuthorNagException ex) {
                  Plugin plugin = registration.getPlugin();

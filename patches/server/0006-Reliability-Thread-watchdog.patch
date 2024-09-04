@@ -6,10 +6,10 @@ Subject: [PATCH] Reliability: Thread watchdog
 
 diff --git a/src/main/java/abomination/ThreadStabilityWatchdog.java b/src/main/java/abomination/ThreadStabilityWatchdog.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..d5aa2f015e2b4dc2afd920126b698b5eb4b2de4d
+index 0000000000000000000000000000000000000000..d0749fe716aa6abf07bb86b59bc880620b097457
 --- /dev/null
 +++ b/src/main/java/abomination/ThreadStabilityWatchdog.java
-@@ -0,0 +1,99 @@
+@@ -0,0 +1,103 @@
 +package abomination;
 +
 +import io.papermc.paper.threadedregions.TickRegionScheduler;
@@ -39,8 +39,8 @@ index 0000000000000000000000000000000000000000..d5aa2f015e2b4dc2afd920126b698b5e
 +                int elapsed = currentTime - threadStamps[i];
 +                if (abomination.config.Reliability.ThreadStabilityWatchdog.justSpamMeMode || elapsed > warningDelay * 10) {
 +                    if (!abomination.config.Reliability.ThreadStabilityWatchdog.justSpamMeMode) threadStamps[i] = currentTime;
-+                    LOGGER.info("Abomination: Thread stuck - " + (elapsed / 10) + " seconds stuck");
 +                    TickThread crashedThread = threads[i];
++                    LOGGER.info("Abomination: Thread stuck - " + (elapsed / 10) + " seconds - " + crashedThread.getName());
 +                    if (crashedThread != null) {
 +                        StackTraceElement[] stackTrace = crashedThread.getStackTrace();
 +                        stackTrace = StacktraceDeobfuscator.INSTANCE.deobfuscateStacktrace(stackTrace);
@@ -91,8 +91,12 @@ index 0000000000000000000000000000000000000000..d5aa2f015e2b4dc2afd920126b698b5e
 +            int id = thr.id;
 +            if (threadStamps.length < id + 1) {
 +                synchronized(lock) {
-+                    threadStamps = new int[id + 1];
-+                    threads = new TickThread[id + 1];
++                    int[] newThreadStamps = new int[id + 1];
++                    TickThread[] newThreads = new TickThread[id + 1];
++                    for (int i = 0 ; i < threadStamps.length ; i++) newThreadStamps[i] = threadStamps[i];
++                    for (int i = 0 ; i < threads.length ; i++) newThreads[i] = threads[i];
++                    threads = newThreads;
++                    threadStamps = newThreadStamps;
 +                }
 +            }
 +            threads[id] = thr;
@@ -110,10 +114,10 @@ index 0000000000000000000000000000000000000000..d5aa2f015e2b4dc2afd920126b698b5e
 +    }
 +}
 diff --git a/src/main/java/abomination/config/Reliability.java b/src/main/java/abomination/config/Reliability.java
-index 7c92166683e9f626c5df53058369aa44ab352624..fdac6283be362ba0a05a146dc3e05cd78d794c24 100644
+index 7c92166683e9f626c5df53058369aa44ab352624..b405b7d9f2d5c5974500659d30697b979b9eb38b 100644
 --- a/src/main/java/abomination/config/Reliability.java
 +++ b/src/main/java/abomination/config/Reliability.java
-@@ -3,4 +3,11 @@ package abomination.config;
+@@ -3,4 +3,10 @@ package abomination.config;
  public class Reliability {
      public static int saveMapDataEveryXSeconds = 600; // 0 to disable
      public static boolean makeAllPluginEventsSynchronized = false; // Fixes some plugins that claim Folia compatibility, but have multithreading bugs
@@ -121,21 +125,20 @@ index 7c92166683e9f626c5df53058369aa44ab352624..fdac6283be362ba0a05a146dc3e05cd7
 +    public static class ThreadStabilityWatchdog {
 +        public static boolean enabled = true;
 +        public static int warningIntervalInSeconds = 10;
-+        public static boolean aggresiveMode = false; // Doesn't mark ticks when the thread is in STATE_IDLE
 +        public static boolean justSpamMeMode = false; // Just spam on every seconds
 +    }
  }
 diff --git a/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java b/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java
-index 8197ccb1c4e5878dbd8007b5fb514640765ec8e4..7c8fb8f8517c67cfd80003389fd9d32e36f12804 100644
+index 8197ccb1c4e5878dbd8007b5fb514640765ec8e4..ba1ea38d534bc32fcc3e5f96cd300652a9501e9b 100644
 --- a/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java
 +++ b/src/main/java/ca/spottedleaf/concurrentutil/scheduler/SchedulerThreadPool.java
 @@ -508,7 +508,9 @@ public class SchedulerThreadPool {
                  switch (startStateType) {
                      case STATE_IDLE: {
                          while (this.state.state == STATE_IDLE) {
-+                            if (!abomination.config.Reliability.ThreadStabilityWatchdog.aggresiveMode) abomination.ThreadStabilityWatchdog.unmarkThread(); // Abomination
++                            abomination.ThreadStabilityWatchdog.unmarkThread(); // Abomination
                              LockSupport.park();
-+                            if (!abomination.config.Reliability.ThreadStabilityWatchdog.aggresiveMode) abomination.ThreadStabilityWatchdog.markThread(); // Abomination
++                            abomination.ThreadStabilityWatchdog.markThread(); // Abomination
                              if (this.scheduler.halted) {
                                  return;
                              }
@@ -147,6 +150,18 @@ index 8197ccb1c4e5878dbd8007b5fb514640765ec8e4..7c8fb8f8517c67cfd80003389fd9d32e
                          final boolean reschedule = startStateTask.runTick();
  
                          this.returnTask(startStateTask, reschedule);
+diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
+index ac56b02498eb38883ae462be6ef3d15cb2a855aa..7f2dc9b9cb3f8a1539f2468d080233c78e7c3c70 100644
+--- a/src/main/java/net/minecraft/server/MinecraftServer.java
++++ b/src/main/java/net/minecraft/server/MinecraftServer.java
+@@ -1288,6 +1288,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+ 
+             // Folia start - region threading
+             if (true) {
++                abomination.ThreadStabilityWatchdog.markThread(); // Abomination
+                 io.papermc.paper.threadedregions.RegionizedServer.getInstance().init(); // Folia - region threading - only after loading worlds
+                 String doneTime = String.format(java.util.Locale.ROOT, "%.3fs", (double) (Util.getNanos() - serverStartTime) / 1.0E9D);
+                 LOGGER.info("Done ({})! For help, type \"help\"", doneTime);
 diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
 index b35a5c9e45dcc61ee7415f2b7650cdcfd37f1ff6..c1d997a28fc4e8ba50c44764ab5e634300a9b734 100644
 --- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java

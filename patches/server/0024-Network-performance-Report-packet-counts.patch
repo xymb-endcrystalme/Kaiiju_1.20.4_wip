@@ -19,7 +19,7 @@ index 053bf34b5fcb63d673c2424e12fa810e36de82c9..1ad04ca0d6404622eebb0493f9be69a1
 +    }
  }
 diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
-index 6574343d0f77ac8122cad6c005f0aada22007f41..3b5b8a8fad816c1340f0a166b925a36914a5b334 100644
+index 6574343d0f77ac8122cad6c005f0aada22007f41..f514d9de0deb6ab31ce0407d834853dbc611a9af 100644
 --- a/src/main/java/net/minecraft/network/Connection.java
 +++ b/src/main/java/net/minecraft/network/Connection.java
 @@ -347,7 +347,39 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
@@ -31,7 +31,7 @@ index 6574343d0f77ac8122cad6c005f0aada22007f41..3b5b8a8fad816c1340f0a166b925a369
 +    private static long lastPrintTime = System.currentTimeMillis();
 +    private static int throttling = 0;
 +
-+    private static <T extends PacketListener> void handlePacket(Packet<T> packet) {
++    private static <T extends PacketListener> void countPacket(Packet<T> packet) {
 +        int interval = abomination.config.Networking.reportPacketCounts.interval;
 +        if (interval <= 0) interval = 1;
 +        if (abomination.config.Networking.reportPacketCounts.enabled == false) return;
@@ -58,7 +58,7 @@ index 6574343d0f77ac8122cad6c005f0aada22007f41..3b5b8a8fad816c1340f0a166b925a369
 +    // Abomination end
 +
      private static <T extends PacketListener> void genericsFtw(Packet<T> packet, PacketListener listener) {
-+        handlePacket(packet); // Abomination
++        countPacket(packet); // Abomination
          packet.handle((T) listener); // CraftBukkit - decompile error
      }
  
