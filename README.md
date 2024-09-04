@@ -43,7 +43,7 @@ If you want to go back to a fork that supports only `.linear v1` don't use Abomi
 | NBT deduplication - Linear v2 feature | 0% | ❌
 | Exploit: Fix overstacked items | 0% | ❌
 | Exploit: Fix oversized shulkers | 0% | ❌
-| Networking: Remove those unnecessary entity move packets | 0% | ❌
+| Networking: Remove those unnecessary entity move packets | 100% | ✅
 
 
 [//]: <> (fixOverstackedItems)

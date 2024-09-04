@@ -1,0 +1,59 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Wed, 4 Sep 2024 08:37:38 +0200
+Subject: [PATCH] Network performance: Lower entity rotation precision
+
+
+diff --git a/src/main/java/abomination/PacketFirewall.java b/src/main/java/abomination/PacketFirewall.java
+index 052642f326087f3d9ba0f7dac324a9247c1725e1..c37390665d404e8e2e50dc54b655a18a871c5eb8 100644
+--- a/src/main/java/abomination/PacketFirewall.java
++++ b/src/main/java/abomination/PacketFirewall.java
+@@ -204,7 +204,7 @@ public class PacketFirewall {
+         if (abomination.config.CoordExploitFirewall.clientbound.packetDistanceLimit <= 0) return true;
+ 
+         if (!packetIsCoordExplotSafe(player, packet)) {
+-            if (abomination.config.CoordExploitFirewall.serverbound.verbose)
++            if (abomination.config.CoordExploitFirewall.clientbound.verbose)
+                 LOGGER.error("PACKET BLOCKED " + packet);
+             return false;
+         }
+diff --git a/src/main/java/abomination/config/Networking.java b/src/main/java/abomination/config/Networking.java
+index 23fb47ad0377762bd5aa237a488677eae8bd56ad..d371a1b512025b490136de28479374c49f996836 100644
+--- a/src/main/java/abomination/config/Networking.java
++++ b/src/main/java/abomination/config/Networking.java
+@@ -3,4 +3,13 @@ package abomination.config;
+ public class Networking {
+     public static boolean useAlternativeKeepAlive = false;
+     public static boolean disableEntityMotionPackets = false; // Almost always unnecessary spammy packet, best turn on
++
++    public static class lowerEntityRotationPrecision {
++        // Lowers sent packet rate by not sending rotations every degree, but snaps to 2 or 8 degrees
++        // Players shouldn't see any difference
++        public static boolean enabled = false;
++
++        public static int throttleEntityHeadRotation = 8;
++        public static int throttlePlayerHeadRotation = 2;
++    }
+ }
+diff --git a/src/main/java/net/minecraft/server/level/ServerEntity.java b/src/main/java/net/minecraft/server/level/ServerEntity.java
+index 35543e7b770418df33b5187d687da6b1ab28d67b..6e3bd60b2697ccdf532fdaf799cf96d89e51abba 100644
+--- a/src/main/java/net/minecraft/server/level/ServerEntity.java
++++ b/src/main/java/net/minecraft/server/level/ServerEntity.java
+@@ -251,8 +251,16 @@ public class ServerEntity {
+                 this.wasRiding = false;
+             }
+ 
++            // Abomination start
++            int headRotationThreshold = 1;
++            if (abomination.config.Networking.lowerEntityRotationPrecision.enabled) {
++                headRotationThreshold = abomination.config.Networking.lowerEntityRotationPrecision.throttleEntityHeadRotation;
++                if (this.entity instanceof ServerPlayer) headRotationThreshold = abomination.config.Networking.lowerEntityRotationPrecision.throttlePlayerHeadRotation;
++                if (headRotationThreshold < 1) headRotationThreshold = 1;
++            } // Abomination end
++
+             i = Mth.floor(this.entity.getYHeadRot() * 256.0F / 360.0F);
+-            if (Math.abs(i - this.lastSentYHeadRot) >= 1) {
++            if (Math.abs(i - this.lastSentYHeadRot) >= headRotationThreshold) { // Abomination
+                 this.broadcast.accept(new ClientboundRotateHeadPacket(this.entity, (byte) i));
+                 this.lastSentYHeadRot = i;
+             }
