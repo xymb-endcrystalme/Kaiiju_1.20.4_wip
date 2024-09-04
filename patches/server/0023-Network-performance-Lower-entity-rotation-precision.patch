@@ -18,7 +18,7 @@ index 052642f326087f3d9ba0f7dac324a9247c1725e1..c37390665d404e8e2e50dc54b655a18a
              return false;
          }
 diff --git a/src/main/java/abomination/config/Networking.java b/src/main/java/abomination/config/Networking.java
-index 23fb47ad0377762bd5aa237a488677eae8bd56ad..d371a1b512025b490136de28479374c49f996836 100644
+index 23fb47ad0377762bd5aa237a488677eae8bd56ad..053bf34b5fcb63d673c2424e12fa810e36de82c9 100644
 --- a/src/main/java/abomination/config/Networking.java
 +++ b/src/main/java/abomination/config/Networking.java
 @@ -3,4 +3,13 @@ package abomination.config;
@@ -31,7 +31,7 @@ index 23fb47ad0377762bd5aa237a488677eae8bd56ad..d371a1b512025b490136de28479374c4
 +        // Players shouldn't see any difference
 +        public static boolean enabled = false;
 +
-+        public static int throttleEntityHeadRotation = 8;
++        public static int throttleEntityHeadRotation = 4;
 +        public static int throttlePlayerHeadRotation = 2;
 +    }
  }

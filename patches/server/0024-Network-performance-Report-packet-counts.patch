@@ -1,0 +1,64 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Wed, 4 Sep 2024 14:06:50 +0200
+Subject: [PATCH] Network performance: Report packet counts
+
+
+diff --git a/src/main/java/abomination/config/Networking.java b/src/main/java/abomination/config/Networking.java
+index 053bf34b5fcb63d673c2424e12fa810e36de82c9..1ad04ca0d6404622eebb0493f9be69a1809b9ac0 100644
+--- a/src/main/java/abomination/config/Networking.java
++++ b/src/main/java/abomination/config/Networking.java
+@@ -12,4 +12,9 @@ public class Networking {
+         public static int throttleEntityHeadRotation = 4;
+         public static int throttlePlayerHeadRotation = 2;
+     }
++
++    public static class reportPacketCounts {
++        public static boolean enabled = false;
++        public static int interval = 10;
++    }
+ }
+diff --git a/src/main/java/net/minecraft/network/Connection.java b/src/main/java/net/minecraft/network/Connection.java
+index 6574343d0f77ac8122cad6c005f0aada22007f41..3b5b8a8fad816c1340f0a166b925a36914a5b334 100644
+--- a/src/main/java/net/minecraft/network/Connection.java
++++ b/src/main/java/net/minecraft/network/Connection.java
+@@ -347,7 +347,39 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
+         }
+     }
+ 
++    // Abomination start
++    private static final java.util.concurrent.ConcurrentMap<Class<?>, java.util.concurrent.atomic.AtomicInteger> packetCounts = new java.util.concurrent.ConcurrentHashMap<>();
++    private static long lastPrintTime = System.currentTimeMillis();
++    private static int throttling = 0;
++
++    private static <T extends PacketListener> void handlePacket(Packet<T> packet) {
++        int interval = abomination.config.Networking.reportPacketCounts.interval;
++        if (interval <= 0) interval = 1;
++        if (abomination.config.Networking.reportPacketCounts.enabled == false) return;
++        packetCounts.computeIfAbsent(packet.getClass(), k -> new java.util.concurrent.atomic.AtomicInteger(0)).incrementAndGet();
++
++        long currentTime = System.currentTimeMillis();
++        if(throttling++ % 100 == 0 && currentTime - lastPrintTime >= interval * 1000) {
++            long lastTime = lastPrintTime;
++            lastPrintTime = currentTime;
++            printAndResetCounts(currentTime, lastTime);
++        }
++    }
++
++    private static void printAndResetCounts(long currentTime, long lastTime) {
++        double time = ((currentTime + 1) - lastTime) / 1000.;
++        final java.util.concurrent.atomic.AtomicInteger sum = new java.util.concurrent.atomic.AtomicInteger(0);
++        packetCounts.forEach((k, v) -> {
++            if (v.get() > 0) Connection.LOGGER.info("Abomination packet " + k.getSimpleName() + " pps " + String.format("%.1f", v.get() / time));
++            sum.addAndGet(v.get());
++            v.set(0);
++        });
++        Connection.LOGGER.info("Abomination packet total pps " + sum.get() / time + "\n");
++    }
++    // Abomination end
++
+     private static <T extends PacketListener> void genericsFtw(Packet<T> packet, PacketListener listener) {
++        handlePacket(packet); // Abomination
+         packet.handle((T) listener); // CraftBukkit - decompile error
+     }
+ 
