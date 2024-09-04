@@ -305,6 +305,16 @@ index 0000000000000000000000000000000000000000..9c1c191016d900b3eef3792fbe7981f8
 +
 +public class BeCarefulReadDocs {
 +}
+diff --git a/src/main/java/abomination/config/CoordExploitFirewall.java b/src/main/java/abomination/config/CoordExploitFirewall.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0a4a217edae02892e09e1a26fa2dbe62ea672024
+--- /dev/null
++++ b/src/main/java/abomination/config/CoordExploitFirewall.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class CoordExploitFirewall {
++}
 diff --git a/src/main/java/abomination/config/Experimental.java b/src/main/java/abomination/config/Experimental.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..9003f5aa67cec38d6a2dc5a5907861bb25c14b35
