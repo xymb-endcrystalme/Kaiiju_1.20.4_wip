@@ -29,9 +29,30 @@ index f03e2058f2ee18b976f04ff8a43300572d4df327..aa429733414b70726832ff5f8c75ac37
  }
  
  fun TaskContainer.registerRunTask(
+diff --git a/src/main/java/abomination/AbominationConfiguration.java b/src/main/java/abomination/AbominationConfiguration.java
+index d97972ba2abd131b76a60365f0d646ca152bc4e5..ee92e803abaaa022876df5fdf6f2ff43403486ca 100644
+--- a/src/main/java/abomination/AbominationConfiguration.java
++++ b/src/main/java/abomination/AbominationConfiguration.java
+@@ -54,6 +54,16 @@ public class AbominationConfiguration {
+             saveConfigFile(properties, configFile);
+         }
+         loadValuesIntoConfig(properties);
++        if (!verify()) {
++            org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
++            LOGGER.error("Abomination config file invalid, intentionally crashing");
++            throw new RuntimeException("Abomination config file invalid, intentionally crashing");
++        }
++    }
++
++    private static boolean verify() {
++        if (!abomination.config.RegionFile.verify()) return false;
++        return true;
+     }
+ 
+     private static boolean isSupportedType(Class<?> type) {
 diff --git a/src/main/java/abomination/LinearRegionFile.java b/src/main/java/abomination/LinearRegionFile.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..255a7cb0815c0586824ed03e6fa7e6c6b3ec5772
+index 0000000000000000000000000000000000000000..92bb140c4cb290b1872b745c8101097fec18f644
 --- /dev/null
 +++ b/src/main/java/abomination/LinearRegionFile.java
 @@ -0,0 +1,580 @@
@@ -285,7 +306,7 @@ index 0000000000000000000000000000000000000000..255a7cb0815c0586824ed03e6fa7e6c6
 +    public LinearRegionFile(RegionStorageInfo storageKey, Path path, Path directory, RegionFileVersion compressionFormat, boolean dsync) throws IOException {
 +        super("LinearRegionFile");
 +        this.regionFile = path;
-+        this.compressionLevel = abomination.config.RegionFile.linearCompressionLevel;
++        this.compressionLevel = abomination.config.RegionFile.linear.compressionLevel;
 +
 +        this.compressor = LZ4Factory.fastestInstance().fastCompressor();
 +        this.decompressor = LZ4Factory.fastestInstance().fastDecompressor();
@@ -617,22 +638,35 @@ index 0000000000000000000000000000000000000000..255a7cb0815c0586824ed03e6fa7e6c6
 +}
 diff --git a/src/main/java/abomination/config/RegionFile.java b/src/main/java/abomination/config/RegionFile.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..925516d4eb775236f28dddd26f829508006c9c1b
+index 0000000000000000000000000000000000000000..6299346534572f1ace124a0946aa6c4e7fb8bd71
 --- /dev/null
 +++ b/src/main/java/abomination/config/RegionFile.java
-@@ -0,0 +1,14 @@
+@@ -0,0 +1,27 @@
 +package abomination.config;
 +
 +public class RegionFile {
++    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
++
 +    public static String type = "mca";
-+    public static int linearCompressionLevel = 1;
 +    public static boolean intentionallyCrashOnBrokenSymlink = true;
++
++    public static class linear {
++        public static int compressionLevel = 1;
++    }
 +
 +    private static Boolean linear = null;
 +
 +    public static boolean isLinear() {
 +        if (linear == null) linear = Boolean.valueOf(type.equals("linear"));
 +        return linear;
++    }
++
++    public static boolean verify() {
++        if (!type.equals("linear") && !type.equals("mca")) {
++            LOGGER.error("Abomination config error - region file type has to be \"mca\" or \"linear\" - \"" + type + "\" found");
++            return false;
++        }
++        return true;
 +    }
 +}
 diff --git a/src/main/java/net/minecraft/util/worldupdate/WorldUpgrader.java b/src/main/java/net/minecraft/util/worldupdate/WorldUpgrader.java
