@@ -1,0 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 22 Aug 2024 01:12:47 +0200
+Subject: [PATCH] DISABLE DROPPERS! REMOVE!
+
+
+diff --git a/src/main/java/net/minecraft/world/level/block/DropperBlock.java b/src/main/java/net/minecraft/world/level/block/DropperBlock.java
+index ddecf443df3679e3098eb54edd19585a0512e342..4d58da9cfcba6c77461b720895b5e8f9a4d4236a 100644
+--- a/src/main/java/net/minecraft/world/level/block/DropperBlock.java
++++ b/src/main/java/net/minecraft/world/level/block/DropperBlock.java
+@@ -51,6 +51,7 @@ public class DropperBlock extends DispenserBlock {
+ 
+     @Override
+     public void dispenseFrom(ServerLevel world, BlockState state, BlockPos pos) {
++        if (true) return; // REMOVE!!!
+         DispenserBlockEntity tileentitydispenser = (DispenserBlockEntity) world.getBlockEntity(pos, BlockEntityType.DROPPER).orElse(null); // CraftBukkit - decompile error
+ 
+         if (tileentitydispenser == null) {
