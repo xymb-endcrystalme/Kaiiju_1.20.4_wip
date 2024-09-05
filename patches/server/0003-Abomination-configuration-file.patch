@@ -315,6 +315,16 @@ index 0000000000000000000000000000000000000000..0a4a217edae02892e09e1a26fa2dbe62
 +
 +public class CoordExploitFirewall {
 +}
+diff --git a/src/main/java/abomination/config/Debug.java b/src/main/java/abomination/config/Debug.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..73a7f99f734356846f2138cc77ea3d74237c2638
+--- /dev/null
++++ b/src/main/java/abomination/config/Debug.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class Debug {
++}
 diff --git a/src/main/java/abomination/config/Experimental.java b/src/main/java/abomination/config/Experimental.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..9003f5aa67cec38d6a2dc5a5907861bb25c14b35

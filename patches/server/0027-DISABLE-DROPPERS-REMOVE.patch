@@ -4,15 +4,25 @@ Date: Thu, 22 Aug 2024 01:12:47 +0200
 Subject: [PATCH] DISABLE DROPPERS! REMOVE!
 
 
+diff --git a/src/main/java/abomination/config/Debug.java b/src/main/java/abomination/config/Debug.java
+index 73a7f99f734356846f2138cc77ea3d74237c2638..6fe20d4cea877a879557d1a9092df537f6935f52 100644
+--- a/src/main/java/abomination/config/Debug.java
++++ b/src/main/java/abomination/config/Debug.java
+@@ -1,4 +1,5 @@
+ package abomination.config;
+ 
+ public class Debug {
++    public static boolean disableDroppers = false;
+ }
 diff --git a/src/main/java/net/minecraft/world/level/block/DropperBlock.java b/src/main/java/net/minecraft/world/level/block/DropperBlock.java
-index ddecf443df3679e3098eb54edd19585a0512e342..4d58da9cfcba6c77461b720895b5e8f9a4d4236a 100644
+index ddecf443df3679e3098eb54edd19585a0512e342..79c70a2944304aa4660bd5d33e2312eab35a6e2b 100644
 --- a/src/main/java/net/minecraft/world/level/block/DropperBlock.java
 +++ b/src/main/java/net/minecraft/world/level/block/DropperBlock.java
 @@ -51,6 +51,7 @@ public class DropperBlock extends DispenserBlock {
  
      @Override
      public void dispenseFrom(ServerLevel world, BlockState state, BlockPos pos) {
-+        if (true) return; // REMOVE!!!
++        if (abomination.config.Debug.disableDroppers) return; // Abomination
          DispenserBlockEntity tileentitydispenser = (DispenserBlockEntity) world.getBlockEntity(pos, BlockEntityType.DROPPER).orElse(null); // CraftBukkit - decompile error
  
          if (tileentitydispenser == null) {
