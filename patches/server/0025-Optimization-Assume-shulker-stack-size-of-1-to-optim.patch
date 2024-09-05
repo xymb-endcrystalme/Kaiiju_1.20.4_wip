@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 5 Sep 2024 08:11:37 +0200
+Subject: [PATCH] Optimization: Assume shulker stack size of 1 to optimize
+ hoppers
+
+
+diff --git a/src/main/java/abomination/config/Performance.java b/src/main/java/abomination/config/Performance.java
+index 26f201cf752e0832ef85474ce0a67846e1362b79..7b5874705356e2871ac94b3e58c922eb25851ef5 100644
+--- a/src/main/java/abomination/config/Performance.java
++++ b/src/main/java/abomination/config/Performance.java
+@@ -4,4 +4,5 @@ public class Performance {
+     public static boolean enableEntityThrottling = false;
+     public static boolean disableDolphinSwimToTreasure = false;
+     public static boolean disablePlayerStats = false;
++    public static boolean optimizeShulkerMaxStackSize = false; // Optimizes hoppers
+ }
+diff --git a/src/main/java/net/minecraft/world/item/ItemStack.java b/src/main/java/net/minecraft/world/item/ItemStack.java
+index 0b802cd958d7a7087933f5d21dc16f9ee51426b6..249b642bde7c7e1c053dfdcae86fb30a98232319 100644
+--- a/src/main/java/net/minecraft/world/item/ItemStack.java
++++ b/src/main/java/net/minecraft/world/item/ItemStack.java
+@@ -628,8 +628,16 @@ public final class ItemStack implements DataComponentHolder {
+         return (Tag) (this.isEmpty() ? new CompoundTag() : this.save(registries, new CompoundTag()));
+     }
+ 
++    Item sameItem = null; // Abomination
++
+     public int getMaxStackSize() {
+-        return (Integer) this.getOrDefault(DataComponents.MAX_STACK_SIZE, 1);
++        // Abomination start
++        if (abomination.config.Performance.optimizeShulkerMaxStackSize && sameItem != null && sameItem == this.item) return 1;
++        int ret = (Integer) this.getOrDefault(DataComponents.MAX_STACK_SIZE, -1);
++        if (ret == -1) return 1;
++        if (abomination.config.Performance.optimizeShulkerMaxStackSize && ret == 1 && this.item != null) sameItem = this.item;
++        return ret;
++        // Abomination end
+     }
+ 
+     public boolean isStackable() {
