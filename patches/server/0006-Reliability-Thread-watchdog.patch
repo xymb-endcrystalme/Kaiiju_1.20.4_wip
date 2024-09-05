@@ -6,10 +6,10 @@ Subject: [PATCH] Reliability: Thread watchdog
 
 diff --git a/src/main/java/abomination/ThreadStabilityWatchdog.java b/src/main/java/abomination/ThreadStabilityWatchdog.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..554df5a594db636d43084961999c33d8bcc44ba9
+index 0000000000000000000000000000000000000000..cb5b345cc50eb38279fb05128c20fd8c09f5b5a0
 --- /dev/null
 +++ b/src/main/java/abomination/ThreadStabilityWatchdog.java
-@@ -0,0 +1,103 @@
+@@ -0,0 +1,112 @@
 +package abomination;
 +
 +import io.papermc.paper.threadedregions.TickRegionScheduler;
@@ -112,6 +112,15 @@ index 0000000000000000000000000000000000000000..554df5a594db636d43084961999c33d8
 +            if (threadStamps.length > id) threadStamps[id] = 0;
 +        }
 +    }
++
++    public static void fullUnmarkThread() {
++        Thread current = Thread.currentThread();
++        if (current instanceof TickThread thr) {
++            int id = thr.id;
++            if (threadStamps.length > id) threadStamps[id] = 0;
++            if (threads.length > id) threads[id] = null;
++        }
++    }
 +}
 diff --git a/src/main/java/abomination/config/Reliability.java b/src/main/java/abomination/config/Reliability.java
 index 7c92166683e9f626c5df53058369aa44ab352624..b405b7d9f2d5c5974500659d30697b979b9eb38b 100644
@@ -151,7 +160,7 @@ index 8197ccb1c4e5878dbd8007b5fb514640765ec8e4..ba1ea38d534bc32fcc3e5f96cd300652
  
                          this.returnTask(startStateTask, reschedule);
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
-index ac56b02498eb38883ae462be6ef3d15cb2a855aa..1b86b440e9cf36ef0a1eef384596cfaa9196d94b 100644
+index ac56b02498eb38883ae462be6ef3d15cb2a855aa..d4eff6e31f28266aa487396d0058a8b6188a312d 100644
 --- a/src/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/src/main/java/net/minecraft/server/MinecraftServer.java
 @@ -1277,6 +1277,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
@@ -166,7 +175,7 @@ index ac56b02498eb38883ae462be6ef3d15cb2a855aa..1b86b440e9cf36ef0a1eef384596cfaa
                  io.papermc.paper.threadedregions.RegionizedServer.getInstance().init(); // Folia - region threading - only after loading worlds
                  String doneTime = String.format(java.util.Locale.ROOT, "%.3fs", (double) (Util.getNanos() - serverStartTime) / 1.0E9D);
                  LOGGER.info("Done ({})! For help, type \"help\"", doneTime);
-+                abomination.ThreadStabilityWatchdog.unmarkThread(); // Abomination
++                abomination.ThreadStabilityWatchdog.fullUnmarkThread(); // Abomination
                  for (;;) {
                      try {
                          Thread.sleep(Long.MAX_VALUE);
