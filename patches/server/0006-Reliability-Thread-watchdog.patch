@@ -6,7 +6,7 @@ Subject: [PATCH] Reliability: Thread watchdog
 
 diff --git a/src/main/java/abomination/ThreadStabilityWatchdog.java b/src/main/java/abomination/ThreadStabilityWatchdog.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..d0749fe716aa6abf07bb86b59bc880620b097457
+index 0000000000000000000000000000000000000000..554df5a594db636d43084961999c33d8bcc44ba9
 --- /dev/null
 +++ b/src/main/java/abomination/ThreadStabilityWatchdog.java
 @@ -0,0 +1,103 @@
@@ -35,7 +35,7 @@ index 0000000000000000000000000000000000000000..d0749fe716aa6abf07bb86b59bc88062
 +        int length = threadStamps.length;
 +        int currentTime = (int)(System.currentTimeMillis() / 100);
 +        for (int i = 0 ; i < length ; i++) {
-+            if (threadStamps[i] != 0) {
++            if (threadStamps[i] != 0 || (abomination.config.Reliability.ThreadStabilityWatchdog.justSpamMeMode && threads[i] != null)) {
 +                int elapsed = currentTime - threadStamps[i];
 +                if (abomination.config.Reliability.ThreadStabilityWatchdog.justSpamMeMode || elapsed > warningDelay * 10) {
 +                    if (!abomination.config.Reliability.ThreadStabilityWatchdog.justSpamMeMode) threadStamps[i] = currentTime;
@@ -151,17 +151,25 @@ index 8197ccb1c4e5878dbd8007b5fb514640765ec8e4..ba1ea38d534bc32fcc3e5f96cd300652
  
                          this.returnTask(startStateTask, reschedule);
 diff --git a/src/main/java/net/minecraft/server/MinecraftServer.java b/src/main/java/net/minecraft/server/MinecraftServer.java
-index ac56b02498eb38883ae462be6ef3d15cb2a855aa..7f2dc9b9cb3f8a1539f2468d080233c78e7c3c70 100644
+index ac56b02498eb38883ae462be6ef3d15cb2a855aa..1b86b440e9cf36ef0a1eef384596cfaa9196d94b 100644
 --- a/src/main/java/net/minecraft/server/MinecraftServer.java
 +++ b/src/main/java/net/minecraft/server/MinecraftServer.java
-@@ -1288,6 +1288,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
+@@ -1277,6 +1277,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
  
-             // Folia start - region threading
-             if (true) {
-+                abomination.ThreadStabilityWatchdog.markThread(); // Abomination
+     protected void runServer() {
+         try {
++            abomination.ThreadStabilityWatchdog.markThread(); // Abomination
+             long serverStartTime = Util.getNanos(); // Paper
+             if (!this.initServer()) {
+                 throw new IllegalStateException("Failed to initialize server");
+@@ -1291,6 +1292,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
                  io.papermc.paper.threadedregions.RegionizedServer.getInstance().init(); // Folia - region threading - only after loading worlds
                  String doneTime = String.format(java.util.Locale.ROOT, "%.3fs", (double) (Util.getNanos() - serverStartTime) / 1.0E9D);
                  LOGGER.info("Done ({})! For help, type \"help\"", doneTime);
++                abomination.ThreadStabilityWatchdog.unmarkThread(); // Abomination
+                 for (;;) {
+                     try {
+                         Thread.sleep(Long.MAX_VALUE);
 diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
 index b35a5c9e45dcc61ee7415f2b7650cdcfd37f1ff6..c1d997a28fc4e8ba50c44764ab5e634300a9b734 100644
 --- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
