@@ -38,9 +38,11 @@ If you want to go back to a fork that supports only `.linear v1` don't use Abomi
 | Linear Region File Format v2 - crash on unknown features | 0% | ❌
 | Linear v2 feature - world/entity/poi in a single region file | 0% | ❌
 | Packet firewall port from SecurityKaiiju 1.19.4 | 100% | ✅
-| NBT deduplication on chunk write | 0% | ❌
-| NBT deduplication on chunk read | 0% | ❌
+| NBT deduplication on chunk write | 100% | ✅
+| NBT deduplication on chunk read | 100% | ✅
 | NBT deduplication - Linear v2 feature | 0% | ❌
+| NBT deduplication - Thresholds | 0% | ❌
+| NBT deduplication - reverting | 100% | ✅
 | Exploit: Fix overstacked items | 0% | ❌
 | Exploit: Fix oversized shulkers | 0% | ❌
 | Networking: Remove those unnecessary entity move packets | 100% | ✅
@@ -61,8 +63,10 @@ TODO
 ### Compile:
 ```
 ./gradlew applyPatches
-./gradlew createReobfBundlerJar --warning-mode none
+./gradlew createReobfBundlerJar
 ```
+
+Afterwards you'll find your jar in `build/libs`.
 
 ### Unit tests:
 ```

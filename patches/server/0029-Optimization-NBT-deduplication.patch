@@ -1,0 +1,839 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Thu, 5 Sep 2024 11:42:49 +0200
+Subject: [PATCH] Optimization: NBT deduplication
+
+
+diff --git a/build.gradle.kts b/build.gradle.kts
+index 715b4bfd0948697bcc4ad60f2cf28afe9bed8917..54acf610c45122265326ddf19dfc4d85809b7ab1 100644
+--- a/build.gradle.kts
++++ b/build.gradle.kts
+@@ -71,6 +71,7 @@ dependencies {
+     implementation("org.lz4:lz4-java:1.8.0")
+     implementation("net.openhft:zero-allocation-hashing:0.16")
+     implementation("io.github.classgraph:classgraph:4.8.158")
++    implementation("com.dynatrace.hash4j:hash4j:0.18.0")
+     // Abomination end
+ }
+ 
+diff --git a/src/main/java/abomination/ChunkKey.java b/src/main/java/abomination/ChunkKey.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..ad099cfda251439c19086ad9b0d36c43f7f62366
+--- /dev/null
++++ b/src/main/java/abomination/ChunkKey.java
+@@ -0,0 +1,47 @@
++package abomination;
++// Stolen from MultiPaper. Credit goes to PureGero - https://github.com/multipaper/multipaper
++
++public class ChunkKey {
++    private final String path;
++    private final int x;
++    private final int z;
++
++    public ChunkKey(String path, int x, int z) {
++        this.path = path;
++        this.x = x;
++        this.z = z;
++    }
++
++    @Override
++    public boolean equals(Object other) {
++        if (other instanceof ChunkKey) {
++            return ((ChunkKey) other).path.equals(path)
++                    && ((ChunkKey) other).x == x
++                    && ((ChunkKey) other).z == z;
++        }
++
++        return super.equals(other);
++    }
++
++    @Override
++    public int hashCode() {
++        // Taken from ChunkCoordIntPair
++        int i = 1664525 * this.x + 1013904223;
++        int j = 1664525 * (this.z ^ -559038737) + 1013904223;
++
++        return path.hashCode() ^ i ^ j;
++    }
++
++    public int getX() {
++        return x;
++    }
++
++    public int getZ() {
++        return z;
++    }
++
++    public String toString() {
++        return "<" + this.path + " " + this.x + " " + this.z + ">";
++    }
++}
++
+diff --git a/src/main/java/abomination/Hash128.java b/src/main/java/abomination/Hash128.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..1dd0dc51ede079389e9105e97b8afab6c9d0d42e
+--- /dev/null
++++ b/src/main/java/abomination/Hash128.java
+@@ -0,0 +1,65 @@
++package abomination;
++
++import net.openhft.hashing.LongTupleHashFunction;
++
++public class Hash128 {
++    public long lower, upper;
++    public int counter = 0;
++
++    public Hash128(long[] hash) { // Made this constructor public
++        this.lower = hash[0];
++        this.upper = hash[1];
++    }
++
++    public Hash128(long lower, long upper) {
++        this.lower = lower;
++        this.upper = upper;
++    }
++
++    public Hash128(String hashString) {
++        if (hashString.length() != 32) {
++            throw new IllegalArgumentException("Hash string must be 32 characters long");
++        }
++        try {
++            this.lower = Long.parseUnsignedLong(hashString.substring(0, 16), 16);
++            this.upper = Long.parseUnsignedLong(hashString.substring(16), 16);
++        } catch (NumberFormatException e) {
++            throw new IllegalArgumentException("Invalid hexadecimal string", e);
++        }
++    }
++
++    public static Hash128 xxHash128(byte array[]) {
++        long[] rawHash = LongTupleHashFunction.xx128().hashBytes(array);
++        if (rawHash[0] < 0) rawHash[0] *= -1; // Fucking Java doesn't support uints...
++        if (rawHash[1] < 0) rawHash[1] *= -1; // Nor 128 bit numbers
++        return new Hash128(rawHash);
++    }
++
++
++    @Override
++    public boolean equals(final Object o) {
++        if (o instanceof Hash128) {
++            Hash128 other = (Hash128)o;
++            return this.lower == other.lower && this.upper == other.upper;
++        }
++        return false;
++    }
++
++    @Override
++    public int hashCode() {
++        return (int)this.lower;
++    }
++
++    public String toString() {
++        return String.format("%016x%016x", this.lower, this.upper);
++    }
++
++    public void add(Hash128 other) {
++        this.lower += other.lower;
++        this.upper += other.upper;
++    }
++
++    public String hexString() {
++        return String.format("%016x%016x", this.lower, this.upper);
++    }
++}
+diff --git a/src/main/java/abomination/HashStreamer.java b/src/main/java/abomination/HashStreamer.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e954a0a1016153eaa703f1b5fb7731f2345af47
+--- /dev/null
++++ b/src/main/java/abomination/HashStreamer.java
+@@ -0,0 +1,52 @@
++package abomination;
++
++import com.dynatrace.hash4j.hashing.Hashing;
++import com.dynatrace.hash4j.hashing.HashStream64;
++
++public class HashStreamer {
++    private HashStream64 lower, upper;
++
++    public HashStreamer() {
++        lower = Hashing.xxh3_64(999666999).hashStream();
++        upper = Hashing.xxh3_64(666999666).hashStream();
++    }
++
++    public Hash128 realize() {
++        long[] rawHash = new long[2];
++        rawHash[0] = lower.getAsLong();
++        rawHash[1] = upper.getAsLong();
++        if (rawHash[0] < 0) rawHash[0] *= -1; // Java doesn't support uints
++        if (rawHash[1] < 0) rawHash[1] *= -1; // Nor 128 bit numbers
++        return new Hash128(rawHash);
++    }
++
++    public void putLong(long a) {
++        lower.putLong(a);
++        upper.putLong(a);
++    }
++
++    public void putInt(int a) {
++        lower.putInt(a);
++        upper.putInt(a);
++    }
++
++    public void putString(String a) {
++        lower.putString(a);
++        upper.putString(a);
++    }
++
++    public void putFloat(float a) {
++        lower.putFloat(a);
++        upper.putFloat(a);
++    }
++
++    public void putChar(char a) {
++        lower.putChar(a);
++        upper.putChar(a);
++    }
++
++    public void putByteArray(byte a[]) {
++        lower.putByteArray(a);
++        upper.putByteArray(a);
++    }
++}
+diff --git a/src/main/java/abomination/ItemStackDeduplicator.java b/src/main/java/abomination/ItemStackDeduplicator.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..0077ef4e0417e0baafcef1ca83dec277a9600c00
+--- /dev/null
++++ b/src/main/java/abomination/ItemStackDeduplicator.java
+@@ -0,0 +1,163 @@
++package abomination;
++
++import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
++import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
++import net.minecraft.world.item.ItemStack;
++import net.minecraft.nbt.CompoundTag;
++import java.util.Optional;
++import net.minecraft.nbt.NbtOps;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.nbt.ListTag;
++import org.slf4j.Logger;
++import com.mojang.logging.LogUtils;
++import net.minecraft.core.component.PatchedDataComponentMap;
++import net.minecraft.network.RegistryFriendlyByteBuf;
++import io.netty.buffer.Unpooled;
++import io.netty.buffer.ByteBuf;
++import net.minecraft.world.level.ChunkPos;
++
++public class ItemStackDeduplicator {
++    private static final Logger LOGGER = LogUtils.getLogger();
++    Object2ObjectOpenHashMap<Hash128, ItemStack> tags = new Object2ObjectOpenHashMap<>();
++
++    private static Object synchronize = new Object();
++    private static ItemStackDeduplicator instance = null;
++
++    public static ItemStackDeduplicator instance() {
++        if (instance != null) return instance;
++        synchronized(synchronize) {
++            if (instance == null) {
++                instance = new ItemStackDeduplicator();
++            }
++        }
++        return instance;
++    }
++
++    public ItemStack getFromHash(String hash) {
++        synchronized (tags) {
++            ItemStack stack = tags.get(new Hash128(hash));
++            return stack;
++        }
++    }
++
++    public ItemStack getFromHash(Hash128 hash) {
++        synchronized (tags) {
++            ItemStack stack = tags.get(hash);
++            return stack;
++        }
++    }
++
++    public void addHashedItemStackNBT(Hash128 hash, CompoundTag nbt) {
++        synchronized (tags) {
++            if (tags.get(hash) == null) {
++                Optional<ItemStack> stack = ItemStack.CODEC.parse(net.minecraft.server.MinecraftServer.getServer().registryAccess().createSerializationContext(NbtOps.INSTANCE), nbt).resultOrPartial((s) -> {});
++                System.out.println("Adding ItemStack NBT hash " + hash.toString());
++                tags.put(hash, stack.get());
++            }
++        }
++    }
++
++    public void addHashedItemStack(Hash128 hash, ItemStack stack) {
++        synchronized (tags) {
++            if (tags.get(hash) == null) {
++                System.out.println("Adding ItemStack hash " + hash.toString());
++                tags.put(hash, stack);
++            }
++        }
++    }
++
++    public Hash128 addHashedComponentStack(PatchedDataComponentMap components) {
++        synchronized (tags) {
++            ItemStack stack = ItemStack.createDummyItemStackFromComponents(net.minecraft.server.MinecraftServer.getServer().registryAccess(), components);
++
++            ByteBuf buf = Unpooled.buffer();
++            RegistryFriendlyByteBuf buf2 = new RegistryFriendlyByteBuf(buf, net.minecraft.server.MinecraftServer.getServer().registryAccess());
++            ItemStack.STREAM_CODEC.encode(buf2, stack);
++
++            Hash128 hash = Hash128.xxHash128(buf.array());
++            if (tags.get(hash) == null) {
++                System.out.println("Adding new ItemStack hash " + hash.toString());
++                tags.put(hash, stack);
++            }
++            return hash;
++        }
++    }
++
++    public static void deduplicateContainersOnWrite(ChunkPos pos, CompoundTag nbt) {
++        if (abomination.config.BeCarefulReadDocs.NbtDeduplication.enabled == false) return;
++
++        Object2IntOpenHashMap<Hash128> deduplications = new Object2IntOpenHashMap<>();
++
++        findAllDeduplicatedComponentHashesRecursive(nbt, deduplications);
++
++        if (deduplications.size() > 0) {
++            if (abomination.config.BeCarefulReadDocs.NbtDeduplication.verbose == true) {
++                LOGGER.info("Deduplication Hashes and Counts - " + pos + ":");
++                for (Object2IntOpenHashMap.Entry<Hash128> entry : deduplications.object2IntEntrySet()) {
++                    LOGGER.info("Hash: " + entry.getKey() + ", Count: " + entry.getIntValue() + " ");
++                }
++            }
++
++            CompoundTag anarchyOptimization = new CompoundTag();
++            anarchyOptimization.putInt("version", 1);
++            CompoundTag itemPalette = new CompoundTag();
++            for (Object2IntOpenHashMap.Entry<Hash128> entry : deduplications.object2IntEntrySet()) {
++                ItemStack stack = instance().getFromHash(entry.getKey());
++                CompoundTag tag = stack.saveComponentsTag(net.minecraft.server.MinecraftServer.getServer().registryAccess());
++                if (tag == null) {
++                    LOGGER.error("Can't find deduplication hash " + entry.getKey().hexString());
++                    continue;
++                }
++                itemPalette.put(entry.getKey().hexString(), tag);
++            }
++            anarchyOptimization.put("itemPalette", itemPalette);
++            nbt.put("abominationDeduplicatedComponents", anarchyOptimization);
++        }
++
++    }
++
++    private static void findAllDeduplicatedComponentHashesRecursive(CompoundTag tag, Object2IntOpenHashMap<Hash128> deduplications) {
++        for (String key : tag.getAllKeys()) {
++            switch (tag.getTagType(key)) {
++                case CompoundTag.TAG_STRING:
++                    if (key.equals("abominationDeduplicatedComponentHash")) {
++                        String hash = tag.getString(key);
++                        Hash128 hashObj = new Hash128(hash);
++                        deduplications.addTo(hashObj, 1);
++                    }
++                    break;
++                case CompoundTag.TAG_LIST:
++                    ListTag listTag = tag.getList(key, CompoundTag.TAG_COMPOUND);
++                    for (int i = 0; i < listTag.size(); i++) {
++                        CompoundTag compoundTag = listTag.getCompound(i);
++                        findAllDeduplicatedComponentHashesRecursive(compoundTag, deduplications);
++                    }
++                    break;
++                case CompoundTag.TAG_COMPOUND:
++                    CompoundTag compoundTag = tag.getCompound(key);
++                    findAllDeduplicatedComponentHashesRecursive(compoundTag, deduplications);
++                    break;
++            }
++        }
++    }
++
++    public static void reduplicateContainersOnRead(CompoundTag nbt, ChunkKey key) {
++        if (!nbt.contains("abominationDeduplicatedComponents")) return;
++
++        CompoundTag abominationDeduplicatedComponents = nbt.getCompound("abominationDeduplicatedComponents");
++        if (abominationDeduplicatedComponents.contains("itemPalette")) {
++            CompoundTag itemPalette = abominationDeduplicatedComponents.getCompound("itemPalette");
++
++            for (String hash : itemPalette.getAllKeys()) {
++                CompoundTag components = itemPalette.getCompound(hash);
++
++                ItemStack componentsItemStack = ItemStack.loadComponentsTag(net.minecraft.server.MinecraftServer.getServer().registryAccess(), components);
++                if (componentsItemStack == null) {
++                    LOGGER.error("Abomination: Couldn't recreate components for hash " + hash + " - " + components);
++                    continue;
++                }
++                instance().addHashedItemStack(new Hash128(hash), componentsItemStack);
++            }
++        }
++    }
++}
+diff --git a/src/main/java/abomination/NBTDeduplicator.java b/src/main/java/abomination/NBTDeduplicator.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..59128197d4a333d189dcb21fb20d5ce1221f7d79
+--- /dev/null
++++ b/src/main/java/abomination/NBTDeduplicator.java
+@@ -0,0 +1,254 @@
++package abomination;
++
++import java.io.ByteArrayOutputStream;
++import java.io.DataOutputStream;
++import java.io.IOException;
++import java.util.ArrayList;
++import java.util.Comparator;
++import java.util.List;
++import java.util.concurrent.ConcurrentLinkedQueue;
++
++import org.apache.commons.lang3.tuple.Pair;
++
++import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
++import net.minecraft.nbt.CompoundTag;
++import net.minecraft.nbt.ListTag;
++import net.openhft.hashing.LongTupleHashFunction;
++import net.minecraft.world.level.ChunkPos;
++import abomination.ChunkKey;
++
++import ca.spottedleaf.dataconverter.minecraft.MCDataConverter;
++import ca.spottedleaf.dataconverter.minecraft.datatypes.MCTypeRegistry;
++import org.slf4j.Logger;
++import com.mojang.logging.LogUtils;
++
++public class NBTDeduplicator {
++    private static final Logger LOGGER = LogUtils.getLogger();
++    Object2ObjectOpenHashMap<Hash128, CompoundTag> tags = new Object2ObjectOpenHashMap<>();
++
++    private static NBTDeduplicator instance = null;
++
++    public static NBTDeduplicator instance() {
++        if (instance == null) {
++            instance = new NBTDeduplicator();
++        }
++        return instance;
++    }
++
++    void addHash(Hash128 hash, CompoundTag tag) {
++        synchronized (tags) {
++            if (tags.get(hash) == null) {
++                CompoundTag copy = tag.copy();
++                tags.put(hash, copy);
++            }
++        }
++    }
++
++    public void addHash(String hash, CompoundTag tag) {
++        long lower = Long.parseLong(hash.substring(0, 16), 16);
++        long upper = Long.parseLong(hash.substring(16, 32), 16);
++
++        synchronized (tags) {
++            addHash(new Hash128(lower, upper), tag);
++        }
++    }
++
++    static boolean first = false;
++
++    CompoundTag getHash(Hash128 hash) {
++        synchronized (tags) {
++            CompoundTag deduplicated = tags.get(hash);
++            return deduplicated;
++        }
++    }
++
++    public Hash128 hashNBT(CompoundTag tag) {
++        ByteArrayOutputStream baos = new ByteArrayOutputStream();
++        try {
++            DataOutputStream dos = new DataOutputStream(baos);
++            tag.write(dos);
++        } catch (IOException ex) {
++            System.out.println("Exception in NBT hashing: " + ex);
++            return null;
++        }
++        long[] rawHash = LongTupleHashFunction.xx128().hashBytes(baos.toByteArray());
++        if (rawHash[0] < 0) rawHash[0] *= -1; // Fucking Java doesn't support uints...
++        if (rawHash[1] < 0) rawHash[1] *= -1; // Nor 128 bit numbers
++        return new Hash128(rawHash);
++    }
++
++    public Hash128 hashFromLU(long lower, long upper) {
++        long array[] = new long[2];
++        array[0] = lower;
++        array[1] = upper;
++        return new Hash128(array);
++    }
++
++    public CompoundTag getFromHash(String hash) {
++        return getHash(new Hash128(hash));
++    }
++
++// TODO: Remove
++    public boolean containsHash(String hash) {
++        long lower = Long.parseLong(hash.substring(0, 16), 16);
++        long upper = Long.parseLong(hash.substring(16, 32), 16);
++        Hash128 hash128 = hashFromLU(lower, upper);
++        CompoundTag deduplicated;
++        synchronized (tags) {
++            deduplicated = tags.get(hash128);
++        }
++        return deduplicated != null;
++    }
++
++    public int size() {
++        return tags.size();
++    }
++
++    public CompoundTag getFromHash(long lower, long upper) {
++        Hash128 hash = hashFromLU(lower, upper);
++        CompoundTag deduplicated;
++        synchronized (tags) {
++            deduplicated = getHash(hash);
++        }
++        if (deduplicated == null) return deduplicated;
++        return deduplicated.copy();
++    }
++
++    public static void deduplicateContainersOnChunkRead(CompoundTag nbt, ChunkKey key) {
++        if (nbt == null) return;
++        if (!nbt.contains("DataVersion")) return;
++        if (!nbt.contains("anarchyOptimization")) return;
++
++        int dataVersion = nbt.getInt("DataVersion");
++        if (dataVersion < 3120) return; // 1.19.2
++        if (dataVersion < 3837) {deduplicateContainersOnChunkRead_legacyItemFormat(nbt, key); return;} // 1.20.5
++    }
++
++    public static void deduplicateContainersOnChunkRead_legacyItemFormat(CompoundTag nbt, ChunkKey key) {
++        NBTDeduplicator deduplicator = NBTDeduplicator.instance();
++        Object2ObjectOpenHashMap<String, ListTag> duplicationsThisChunk = new Object2ObjectOpenHashMap<>();
++
++        int dataVersion = nbt.getInt("DataVersion");
++        int currentVersion = net.minecraft.SharedConstants.getCurrentVersion().getDataVersion().getVersion();
++        if (nbt.contains("anarchyOptimization")) {
++            LOGGER.info("Legacy NBT optimization found - dataVersion: " + dataVersion + " currentVersion: " + currentVersion + " chunk: " + key);
++            CompoundTag anarchyOptimization = nbt.getCompound("anarchyOptimization");
++            int version = nbt.getInt("version");
++            ListTag itemPalette = anarchyOptimization.getList("itemPalette", 10);
++            for(int i = 0; i < itemPalette.size(); ++i) {
++                CompoundTag paletteItem = itemPalette.getCompound(i);
++                String hash = paletteItem.getString("hash");
++                duplicationsThisChunk.put(hash, paletteItem.getList("item", 10));
++            }
++        }
++
++        int deduplicatedItems = 0;
++        ListTag nbttaglist3 = nbt.getList("block_entities", 10);
++        for (int k1 = 0; k1 < nbttaglist3.size(); ++k1) {
++            CompoundTag blockEntityNbt = nbttaglist3.getCompound(k1);
++            if (blockEntityNbt.contains("Items")) {
++                ListTag items = blockEntityNbt.getList("Items", 10);
++                for(int i = 0; i < items.size(); ++i) {
++                    CompoundTag itemTag = items.getCompound(i);
++                    if (itemTag.contains("id")) {
++                        String id = itemTag.getString("id");
++                        if (id.contains("shulker_box")) {
++                            if (itemTag.contains("tag")) {
++                                CompoundTag tag = itemTag.getCompound("tag");
++                                if (tag.contains("BlockEntityTag")) {
++                                    CompoundTag blockEntityTag = tag.getCompound("BlockEntityTag");
++
++                                    if (blockEntityTag.contains("hash")) {
++                                        Hash128 hash = hashCompoundTag(itemTag.getCompound("tag"));
++                                        hash.add(hashCompoundTag(itemTag.getCompound("id")));
++
++                                        if (deduplicator.getHash(hash) == null) {
++                                            CompoundTag copy = itemTag.copy();
++                                            copy.getCompound("tag").getCompound("BlockEntityTag").put("Items", duplicationsThisChunk.get(blockEntityTag.getString("hash")));
++                                            copy.getCompound("tag").getCompound("BlockEntityTag").remove("hash");
++
++                                            final CompoundTag converted = MCDataConverter.convertTag(
++                                                    MCTypeRegistry.ITEM_STACK, copy, dataVersion,
++                                                    currentVersion
++                                            );
++                                            ItemStackDeduplicator.instance().addHashedItemStackNBT(hash, converted);
++                                            deduplicator.addHash(hash, converted);
++                                        }
++
++                                        blockEntityTag.putString("hash", hash.hexString());
++                                    }
++                                }
++                            }
++                        }
++                    }
++                }
++            }
++        }
++        if (deduplicatedItems > 0 && !nbt.contains("anarchyOptimization")) {
++            NBTDeduplicatorUpdateManager.markForUpdate(key);
++        }
++    }
++
++    public static Hash128 hashCompoundTag(CompoundTag tag) {
++        HashStreamer streamer = new HashStreamer();
++        hashCompoundTagRecursive(tag, streamer);
++        return streamer.realize();
++    }
++
++    private static void hashCompoundTagRecursive(CompoundTag tag, HashStreamer streamer) {
++        for (String key : tag.getAllKeys()) {
++            streamer.putString(key);
++
++            switch (tag.getTagType(key)) {
++                case CompoundTag.TAG_BYTE:
++                    streamer.putInt(tag.getByte(key));
++                    break;
++                case CompoundTag.TAG_SHORT:
++                    streamer.putInt(tag.getShort(key));
++                    break;
++                case CompoundTag.TAG_INT:
++                    streamer.putInt(tag.getInt(key));
++                    break;
++                case CompoundTag.TAG_LONG:
++                    streamer.putLong(tag.getLong(key));
++                    break;
++                case CompoundTag.TAG_FLOAT:
++                    streamer.putFloat(tag.getFloat(key));
++                    break;
++                case CompoundTag.TAG_DOUBLE:
++                    streamer.putLong(Double.doubleToLongBits(tag.getDouble(key)));
++                    break;
++                case CompoundTag.TAG_BYTE_ARRAY:
++                    byte[] byteArray = tag.getByteArray(key);
++                    streamer.putByteArray(byteArray);
++                    break;
++                case CompoundTag.TAG_STRING:
++                    streamer.putString(tag.getString(key));
++                    break;
++                case CompoundTag.TAG_LIST:
++                    ListTag listTag = tag.getList(key, CompoundTag.TAG_COMPOUND);
++                    for (int i = 0; i < listTag.size(); i++) {
++                        CompoundTag compoundTag = listTag.getCompound(i);
++                        hashCompoundTagRecursive(compoundTag, streamer);
++                    }
++                    break;
++                case CompoundTag.TAG_COMPOUND:
++                    CompoundTag compoundTag = tag.getCompound(key);
++                    hashCompoundTagRecursive(compoundTag, streamer);
++                    break;
++                case CompoundTag.TAG_INT_ARRAY:
++                    int[] intArray = tag.getIntArray(key);
++                    for (int i : intArray) {
++                        streamer.putInt(i);
++                    }
++                    break;
++                case CompoundTag.TAG_LONG_ARRAY:
++                    long[] longArray = tag.getLongArray(key);
++                    for (long l : longArray) {
++                        streamer.putLong(l);
++                    }
++                    break;
++            }
++        }
++    }
++}
+diff --git a/src/main/java/abomination/NBTDeduplicatorUpdateManager.java b/src/main/java/abomination/NBTDeduplicatorUpdateManager.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..346ec7a15b75ea456787fbf170c13cbe32a8a270
+--- /dev/null
++++ b/src/main/java/abomination/NBTDeduplicatorUpdateManager.java
+@@ -0,0 +1,28 @@
++package abomination;
++
++import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
++
++public class NBTDeduplicatorUpdateManager {
++    static ObjectOpenHashSet<ChunkKey> set = new ObjectOpenHashSet<>();
++
++    public static void markForUpdate(ChunkKey key) {
++        synchronized(set) {
++            set.add(key);
++        }
++    }
++
++    public static void done(ChunkKey key) {
++        synchronized(set) {
++            set.remove(key);
++        }
++    }
++
++    public static boolean shouldBeWritten(ChunkKey key) {
++        synchronized(set) {
++            if (set.contains(key)) {
++                return true;
++            }
++            return false;
++        }
++    }
++}
+diff --git a/src/main/java/abomination/config/BeCarefulReadDocs.java b/src/main/java/abomination/config/BeCarefulReadDocs.java
+index 9c1c191016d900b3eef3792fbe7981f86bcd3b17..4f726fee990fe9f735440eb11bb523755f60a236 100644
+--- a/src/main/java/abomination/config/BeCarefulReadDocs.java
++++ b/src/main/java/abomination/config/BeCarefulReadDocs.java
+@@ -1,4 +1,15 @@
+ package abomination.config;
+ 
+ public class BeCarefulReadDocs {
++    public static class NbtDeduplication {
++        public static boolean enabled = false;
++        public static boolean verbose = false;
++
++        private static Boolean isEnabledStruct = null;
++
++        public static boolean isEnabled() {
++            if (isEnabledStruct == null) isEnabledStruct = Boolean.valueOf(enabled);
++            return isEnabledStruct;
++        }
++    }
+ }
+diff --git a/src/main/java/net/minecraft/world/ContainerHelper.java b/src/main/java/net/minecraft/world/ContainerHelper.java
+index 2eb2eae92a62d302965d30e07bbe38d4309430a4..56d0eeff9c89a03ade1d3b4327526e283de1590d 100644
+--- a/src/main/java/net/minecraft/world/ContainerHelper.java
++++ b/src/main/java/net/minecraft/world/ContainerHelper.java
+@@ -31,7 +31,7 @@ public class ContainerHelper {
+             if (!itemStack.isEmpty()) {
+                 CompoundTag compoundTag = new CompoundTag();
+                 compoundTag.putByte("Slot", (byte)i);
+-                listTag.add(itemStack.save(registries, compoundTag));
++                listTag.add(itemStack.saveDeduplicated(registries, compoundTag)); // Abomination
+             }
+         }
+ 
+diff --git a/src/main/java/net/minecraft/world/item/ItemStack.java b/src/main/java/net/minecraft/world/item/ItemStack.java
+index cdd7483a9518c461cd0f1f492cb6954acb15e0a0..72dcf1188cc6d3d4c000972c4b5691a4da5becec 100644
+--- a/src/main/java/net/minecraft/world/item/ItemStack.java
++++ b/src/main/java/net/minecraft/world/item/ItemStack.java
+@@ -340,11 +340,56 @@ public final class ItemStack implements DataComponentHolder {
+         }
+     }
+ 
++    // Abomination start
++    abomination.Hash128 componentDeduplicated = null;
++
+     public static Optional<ItemStack> parse(HolderLookup.Provider registries, Tag nbt) {
+-        return ItemStack.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), nbt).resultOrPartial((s) -> {
+-            ItemStack.LOGGER.error("Tried to load invalid item: '{}'", s);
++        String hash = null;
++        if (nbt instanceof CompoundTag itemTag) {
++            if (itemTag.contains("abominationDeduplicatedComponentHash")) {
++                hash = itemTag.getString("abominationDeduplicatedComponentHash");
++            } else if (itemTag.contains("id")) {
++                String id = itemTag.getString("id");
++                if (id != null && id.contains("shulker_box")) {
++                    if (itemTag.contains("components")) {
++                        CompoundTag componentsTag = itemTag.getCompound("components");
++
++                        if (componentsTag.contains("minecraft:block_entity_data")) {
++                            CompoundTag blockEntityData = componentsTag.getCompound("minecraft:block_entity_data");
++                            if (blockEntityData != null) {
++                                if (blockEntityData.contains("hash")) {
++                                    hash = blockEntityData.getString("hash");
++                                }
++                            }
++                        }
++                    }
++                }
++            }
++            if (false && hash != null) {
++                CompoundTag converted = abomination.NBTDeduplicator.instance().getFromHash(hash);
++                if (((CompoundTag)nbt).contains("Slot") && converted.contains("Slot")) {
++                    converted.putInt("Slot", ((CompoundTag)nbt).getInt("Slot"));
++                    nbt = (Tag)converted;
++                }
++            }
++        }
++
++        Optional<ItemStack> stack = ItemStack.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), nbt).resultOrPartial((s) -> {
++            ItemStack.LOGGER.error("Tried to load invalid item: '{}' " + nbt.toString(), s);
+         });
++
++        if (hash != null) {
++            ItemStack duplicatedStack = abomination.ItemStackDeduplicator.instance().getFromHash(hash);
++            if (stack.isPresent()) {
++                ItemStack finalItemStack = stack.get();
++                finalItemStack.components = duplicatedStack.components;
++                finalItemStack.componentDeduplicated = new abomination.Hash128(hash);
++            }
++        }
++
++        return stack;
+     }
++    // Abomination end
+ 
+     public static ItemStack parseOptional(HolderLookup.Provider registries, CompoundTag nbt) {
+         return nbt.isEmpty() ? ItemStack.EMPTY : (ItemStack) ItemStack.parse(registries, nbt).orElse(ItemStack.EMPTY);
+@@ -608,6 +653,58 @@ public final class ItemStack implements DataComponentHolder {
+         return this.getItem().finishUsingItem(this, world, user);
+     }
+ 
++    // Abomination start
++    public Tag saveDeduplicated(HolderLookup.Provider registries, Tag prefix) {
++        if (this.isEmpty()) throw new IllegalStateException("Cannot encode empty ItemStack");
++
++        if (!abomination.config.BeCarefulReadDocs.NbtDeduplication.isEnabled())
++            return save(registries, prefix);
++        if (!this.toString().contains("shulker_box"))
++            return save(registries, prefix);
++
++        if (this.componentDeduplicated == null) {
++            abomination.Hash128 hash = abomination.ItemStackDeduplicator.instance().addHashedComponentStack(this.components);
++            this.componentDeduplicated = hash;
++        }
++
++        if (this.componentDeduplicated != null) {
++            CompoundTag tag = (CompoundTag)prefix;
++            tag.putInt("count", this.getCount());
++            tag.putString("id", String.valueOf(this.getItem()));
++            tag.putString("abominationDeduplicatedComponentHash", this.componentDeduplicated.hexString());
++            return tag;
++        }
++        var tag = (Tag) ItemStack.CODEC.encode(this, registries.createSerializationContext(NbtOps.INSTANCE), prefix).getOrThrow();
++        return tag;
++    }
++
++    public static ItemStack loadComponentsTag(HolderLookup.Provider registries, CompoundTag components) {
++        CompoundTag tag = new CompoundTag();
++        tag.put("components", components);
++        tag.putInt("count", 1);
++        tag.putString("id", "minecraft:shulker_box");
++        ItemStack newItemStack = parseOptional(registries, tag);
++        if (newItemStack == null || newItemStack.isEmpty() || newItemStack.components == null) return null;
++        return newItemStack;
++    }
++
++    public static ItemStack createDummyItemStackFromComponents(HolderLookup.Provider registries, PatchedDataComponentMap components) {
++        CompoundTag tag = new CompoundTag();
++        tag.putInt("count", 1);
++        tag.putString("id", "minecraft:shulker_box");
++        ItemStack newItemStack = parseOptional(registries, tag);
++        newItemStack.components = components;
++        if (newItemStack == null || newItemStack.isEmpty() || newItemStack.components == null) return null;
++        return newItemStack;
++    }
++
++    public CompoundTag saveComponentsTag(HolderLookup.Provider registries) {
++        CompoundTag prefix = new CompoundTag();
++        CompoundTag tag = (CompoundTag) ItemStack.CODEC.encode(this, registries.createSerializationContext(NbtOps.INSTANCE), prefix).getOrThrow();
++        return tag.getCompound("components");
++    }
++    // Abomination end
++
+     public Tag save(HolderLookup.Provider registries, Tag prefix) {
+         if (this.isEmpty()) {
+             throw new IllegalStateException("Cannot encode empty ItemStack");
+diff --git a/src/main/java/net/minecraft/world/level/chunk/storage/RegionFileStorage.java b/src/main/java/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
+index a24c1627a9e2e0d4a5acaedb6c50491726bfe03c..8c9e2638d9a91baf6feeb1d3c0cc827e4efc7f85 100644
+--- a/src/main/java/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
++++ b/src/main/java/net/minecraft/world/level/chunk/storage/RegionFileStorage.java
+@@ -265,6 +265,8 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+                         }
+                     }
+                     // Paper end - recover from corrupt regionfile header
++                    abomination.NBTDeduplicator.deduplicateContainersOnChunkRead(nbttagcompound, new abomination.ChunkKey(this.info.level(), pos.x, pos.z)); // Abomination // Legacy code, not used anywhere else than 6b6t.org & endcrystal.me
++                    abomination.ItemStackDeduplicator.reduplicateContainersOnRead(nbttagcompound, new abomination.ChunkKey(this.info.level(), pos.x, pos.z)); // Abomination
+                     break label43;
+                 }
+ 
+@@ -346,6 +348,7 @@ public class RegionFileStorage implements AutoCloseable, ca.spottedleaf.moonrise
+             DataOutputStream dataoutputstream = regionfile.getChunkDataOutputStream(pos);
+ 
+             try {
++                abomination.ItemStackDeduplicator.deduplicateContainersOnWrite(pos, nbt); // Abomination
+                 abomination.PreventLagBooks.preventLagBooks(pos, nbt); // Abomination
+                 NbtIo.write(nbt, (DataOutput) dataoutputstream);
+                 regionfile.setOversized(pos.x, pos.z, false); // Paper - We don't do this anymore, mojang stores differently, but clear old meta flag if it exists to get rid of our own meta file once last oversized is gone
