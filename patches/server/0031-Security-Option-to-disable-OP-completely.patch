@@ -1,0 +1,60 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Tue, 10 Sep 2024 15:07:05 +0200
+Subject: [PATCH] Security: Option to disable OP completely
+
+
+diff --git a/src/main/java/abomination/config/Security.java b/src/main/java/abomination/config/Security.java
+index 8793f8d86e59728e7948ca1e2ab74341155944d6..09f81e89644cbf2f56fb383b97c5fd910d7bd06b 100644
+--- a/src/main/java/abomination/config/Security.java
++++ b/src/main/java/abomination/config/Security.java
+@@ -1,4 +1,5 @@
+ package abomination.config;
+ 
+ public class Security {
++    public static boolean disableOp = false;
+ }
+diff --git a/src/main/java/net/minecraft/server/commands/OpCommand.java b/src/main/java/net/minecraft/server/commands/OpCommand.java
+index e7b444a10b244828827b3c66c53465206ea8e0ec..fc211cd3abc4755984624e30954f1ce6804fe186 100644
+--- a/src/main/java/net/minecraft/server/commands/OpCommand.java
++++ b/src/main/java/net/minecraft/server/commands/OpCommand.java
+@@ -44,6 +44,12 @@ public class OpCommand {
+ 
+         for (GameProfile gameProfile : targets) {
+             if (!playerList.isOp(gameProfile)) {
++                // Abomination start
++                if (abomination.config.Security.disableOp) {
++                    source.sendFailure(Component.literal("OP is disabled on this server for security reasons"));
++                    return 0;
++                }
++                // Abomination end
+                 playerList.op(gameProfile);
+                 i++;
+                 source.sendSuccess(() -> Component.translatable("commands.op.success", gameProfile.getName()), true); // Paper - fixes MC-253721
+diff --git a/src/main/java/net/minecraft/server/players/PlayerList.java b/src/main/java/net/minecraft/server/players/PlayerList.java
+index 0bc623397576fc7c95fdeebf86b660b7ae1f2c25..b181db68990435c89d0cda1ff0b32b26bffc5029 100644
+--- a/src/main/java/net/minecraft/server/players/PlayerList.java
++++ b/src/main/java/net/minecraft/server/players/PlayerList.java
+@@ -1183,6 +1183,14 @@ public abstract class PlayerList {
+     }
+ 
+     public void op(GameProfile profile) {
++        // Abomination start
++        if (abomination.config.Security.disableOp) {
++            ServerPlayer player = this.getPlayer(profile.getId());
++            LOGGER.error("Abomination: Rogue op prevented " + player.getScoreboardName());
++            Thread.dumpStack();
++            return;
++        }
++        // Abomination end
+         this.ops.add(new ServerOpListEntry(profile, this.server.getOperatorUserPermissionLevel(), this.ops.canBypassPlayerLimit(profile)));
+         ServerPlayer entityplayer = this.getPlayer(profile.getId());
+ 
+@@ -1255,6 +1263,7 @@ public abstract class PlayerList {
+     }
+ 
+     public boolean isOp(GameProfile profile) {
++        if (abomination.config.Security.disableOp) return false; // Abomination
+         return this.ops.contains(profile) || this.server.isSingleplayerOwner(profile) && this.server.getWorldData().isAllowCommands() || this.allowCommandsForAllPlayers;
+     }
+ 
