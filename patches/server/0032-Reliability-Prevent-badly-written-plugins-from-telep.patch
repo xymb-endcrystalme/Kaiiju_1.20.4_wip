@@ -1,0 +1,70 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Tue, 10 Sep 2024 15:47:56 +0200
+Subject: [PATCH] Reliability: Prevent badly written plugins from teleporting
+ you all across the map
+
+
+diff --git a/src/main/java/abomination/config/Reliability.java b/src/main/java/abomination/config/Reliability.java
+index b405b7d9f2d5c5974500659d30697b979b9eb38b..8ab6d4450b35acb38bafb994c46d016a2689848a 100644
+--- a/src/main/java/abomination/config/Reliability.java
++++ b/src/main/java/abomination/config/Reliability.java
+@@ -9,4 +9,6 @@ public class Reliability {
+         public static int warningIntervalInSeconds = 10;
+         public static boolean justSpamMeMode = false; // Just spam on every seconds
+     }
++
++    public static int limitLongRangeMovementEvent = 128; // Prevents some teleport exploit bugs - set to 0 to completely disable
+ }
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index 1bb35ed1b3a15c4d28181185831cf17d974f9e57..ce5953d752da21519fb6772e6136676bbc608be0 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -511,6 +511,29 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+         return Mth.clamp(d, -2.0E7D, 2.0E7D);
+     }
+ 
++    // Abomination start
++    private boolean eventShouldBeCancelled(Location from, Location to) {
++        int longRangeMovementEventCancel = abomination.config.Reliability.limitLongRangeMovementEvent;
++        if (longRangeMovementEventCancel > 0) {
++            double fromXa = from.x() - this.player.getX();
++            double fromZa = from.z() - this.player.getZ();
++            double toXa = to.x() - this.player.getX();
++            double toZa = to.z() - this.player.getZ();
++            double fromDist = Math.sqrt(fromXa * fromXa + fromZa * fromZa);
++            double toDist = Math.sqrt(toXa * toXa + toZa * toZa);
++            if (fromDist > longRangeMovementEventCancel || toDist > longRangeMovementEventCancel) {
++                LOGGER.error("Abomination: Long range teleport event detected - from: " + this.player.getX() + " " + this.player.getZ() + " to: " + fromXa + " " + fromZa + " distance: " + fromDist + " player: " + this.player.getScoreboardName());
++                return true;
++            }
++            if (toDist > longRangeMovementEventCancel) {
++                LOGGER.error("LONGRANGE_TELEPORT EVENT DETECTED TO " + this.player.getX() + " " + this.player.getZ() + " vs " + toXa + " " + toZa + " " + toDist + " " + this.player.getScoreboardName());
++                return true;
++            }
++        }
++        return false;
++    }
++    // Abomination end
++
+     @Override
+     public void handleMoveVehicle(ServerboundMoveVehiclePacket packet) {
+         if (!abomination.PacketFirewall.serverboundFirewall(packet, this.player)) return; // Abomination
+@@ -698,6 +721,8 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+                     PlayerMoveEvent event = new PlayerMoveEvent(player, from, to);
+                     this.cserver.getPluginManager().callEvent(event);
+ 
++                    if ((!oldTo.equals(event.getTo()) || event.isCancelled()) && eventShouldBeCancelled(event.getFrom(), event.getTo())) return; // Abomination
++
+                     // If the event is cancelled we move the player back to their old location.
+                     if (event.isCancelled()) {
+                         this.player.getBukkitEntity().teleportAsync(from, PlayerTeleportEvent.TeleportCause.PLUGIN); // Folia - region threading
+@@ -1614,6 +1639,8 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+                                     PlayerMoveEvent event = new PlayerMoveEvent(player, from, to);
+                                     this.cserver.getPluginManager().callEvent(event);
+ 
++                                    if ((!oldTo.equals(event.getTo()) || event.isCancelled()) && eventShouldBeCancelled(event.getFrom(), event.getTo())) return; // Abomination
++
+                                     // If the event is cancelled we move the player back to their old location.
+                                     if (event.isCancelled()) {
+                                         this.player.getBukkitEntity().teleportAsync(from, PlayerTeleportEvent.TeleportCause.PLUGIN); // Folia - region threading
