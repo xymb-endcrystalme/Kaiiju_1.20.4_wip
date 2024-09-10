@@ -1,0 +1,96 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Tue, 10 Sep 2024 16:25:40 +0200
+Subject: [PATCH] Unsupported WIP: Allow bedrock breakng
+
+Be careful, this option allows players to break also some other indestructible blocks
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 4b9a10dd1435380b6f56ed8e3fc1317a0af97db3..7528ece1d7984ae48041d7ae3cdac50b9cceed3b 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -18,4 +18,7 @@ public class UnsupportedWipOptionsWillChange {
+         public static int limitBanner = 32;
+         public static int limitBell = 32;
+     }
++
++    public static boolean bedrockBreaking = false;
++    public static int bedrockBreakingInterval = 10;
+ }
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index f822dbd903c5fd256fc4f8c6955bd532c7ba2b60..99dd1de09859dc788a711048720f68212e7fe4ee 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -1954,12 +1954,64 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+                     }
+                 }
+                 // Paper end - Send block entities after destroy prediction
++                // Abomination start
++                if (abomination.config.UnsupportedWipOptionsWillChange.bedrockBreaking && this.player.level().getBlockState(blockposition).getDestroySpeed(this.player.level(), blockposition) == -1.0F  && this.player.level().getBlockState(blockposition).isViewBlocking(this.player.level(), blockposition))
++                    startBreakingUnbreakableBlocks(blockposition);
++                // Abomination end
+                 return;
+             default:
+                 throw new IllegalArgumentException("Invalid player action");
+         }
+     }
+ 
++    // Abomination start
++    boolean verifyBedrockBreaking(BlockPos blockposition) {
++        ResourceLocation dimension = this.player.level().dimension().location();
++        int x = blockposition.getX();
++        int y = blockposition.getY();
++        int z = blockposition.getZ();
++
++        if (dimension.toString().equals("minecraft:the_end")) {
++            return !(Math.abs(x) < 5 && Math.abs(z) < 5);
++        } else if (dimension.toString().equals("minecraft:the_nether")) {
++            return !(y == 0 || y == 127 || y == 128);
++        } else if (dimension.toString().equals("minecraft:overworld")) {
++            return !(y == 0 || y == -64);
++        }
++        return true;
++    }
++
++    BlockPos lastUnbreakableBlockBeingBroken = null;
++    long startedBreaking = 0;
++
++    void startBreakingUnbreakableBlocks(BlockPos blockposition) {
++        lastUnbreakableBlockBeingBroken = null;
++
++        if (verifyBedrockBreaking(blockposition) && lastUnbreakableBlockBeingBroken != blockposition) {
++            lastUnbreakableBlockBeingBroken = blockposition;
++            startedBreaking = System.currentTimeMillis();
++        }
++    }
++
++    void testBreaking() {
++        if (lastUnbreakableBlockBeingBroken == null) return;
++        if (this.player.distanceToSqr((double)lastUnbreakableBlockBeingBroken.getX() + 0.5D, (double)lastUnbreakableBlockBeingBroken.getY() + 0.5D, (double)lastUnbreakableBlockBeingBroken.getZ() + 0.5D) > 100.0D) {
++            stopBreakingUnbreakableBlocks();
++            return;
++        }
++        if (System.currentTimeMillis() - startedBreaking > abomination.config.UnsupportedWipOptionsWillChange.bedrockBreakingInterval * 1000) {
++            BlockState brokenBlockState = this.player.level().getBlockState(lastUnbreakableBlockBeingBroken);
++            this.player.level().setBlock(lastUnbreakableBlockBeingBroken, Blocks.AIR.defaultBlockState(), 3);
++            LOGGER.info("Abomination: Broken an unbreakable block " + this.player.getName().getString() + " successfully broke " + brokenBlockState.getBlock().getDescriptionId() + " at " + lastUnbreakableBlockBeingBroken.toShortString() + " in dimension " + this.player.level().dimension().location().toString());
++            stopBreakingUnbreakableBlocks();
++        }
++    }
++
++    void stopBreakingUnbreakableBlocks() {
++        lastUnbreakableBlockBeingBroken = null;
++    }
++    // Abomination end
++
+     private static boolean wasBlockPlacementAttempt(ServerPlayer player, ItemStack stack) {
+         if (stack.isEmpty()) {
+             return false;
+@@ -2687,6 +2739,7 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+         if (event.isCancelled()) return;
+         // CraftBukkit end
+         this.player.swing(packet.getHand());
++        if (abomination.config.UnsupportedWipOptionsWillChange.bedrockBreaking) testBreaking(); // Abomination
+     }
+ 
+     @Override

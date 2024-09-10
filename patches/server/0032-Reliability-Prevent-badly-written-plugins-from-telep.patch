@@ -17,7 +17,7 @@ index b405b7d9f2d5c5974500659d30697b979b9eb38b..8ab6d4450b35acb38bafb994c46d016a
 +    public static int limitLongRangeMovementEvent = 128; // Prevents some teleport exploit bugs - set to 0 to completely disable
  }
 diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
-index 1bb35ed1b3a15c4d28181185831cf17d974f9e57..ce5953d752da21519fb6772e6136676bbc608be0 100644
+index 1bb35ed1b3a15c4d28181185831cf17d974f9e57..f822dbd903c5fd256fc4f8c6955bd532c7ba2b60 100644
 --- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 +++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
 @@ -511,6 +511,29 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
@@ -39,7 +39,7 @@ index 1bb35ed1b3a15c4d28181185831cf17d974f9e57..ce5953d752da21519fb6772e6136676b
 +                return true;
 +            }
 +            if (toDist > longRangeMovementEventCancel) {
-+                LOGGER.error("LONGRANGE_TELEPORT EVENT DETECTED TO " + this.player.getX() + " " + this.player.getZ() + " vs " + toXa + " " + toZa + " " + toDist + " " + this.player.getScoreboardName());
++                LOGGER.error("Abomination: Long range teleport event detected \"to\" - from: " + this.player.getX() + " " + this.player.getZ() + " to: " + toXa + " " + toZa + " distance: " + toDist + " player: " + this.player.getScoreboardName());
 +                return true;
 +            }
 +        }
