@@ -200,10 +200,10 @@ index 0000000000000000000000000000000000000000..7e954a0a1016153eaa703f1b5fb7731f
 +}
 diff --git a/src/main/java/abomination/ItemStackDeduplicator.java b/src/main/java/abomination/ItemStackDeduplicator.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..0077ef4e0417e0baafcef1ca83dec277a9600c00
+index 0000000000000000000000000000000000000000..669e9b6ceef7601d6e157cee753868421b2632b7
 --- /dev/null
 +++ b/src/main/java/abomination/ItemStackDeduplicator.java
-@@ -0,0 +1,163 @@
+@@ -0,0 +1,166 @@
 +package abomination;
 +
 +import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
@@ -257,7 +257,8 @@ index 0000000000000000000000000000000000000000..0077ef4e0417e0baafcef1ca83dec277
 +        synchronized (tags) {
 +            if (tags.get(hash) == null) {
 +                Optional<ItemStack> stack = ItemStack.CODEC.parse(net.minecraft.server.MinecraftServer.getServer().registryAccess().createSerializationContext(NbtOps.INSTANCE), nbt).resultOrPartial((s) -> {});
-+                System.out.println("Adding ItemStack NBT hash " + hash.toString());
++                if (abomination.config.BeCarefulReadDocs.NbtDeduplication.verbose)
++                    LOGGER.info("Adding ItemStack NBT hash " + hash.toString());
 +                tags.put(hash, stack.get());
 +            }
 +        }
@@ -266,7 +267,8 @@ index 0000000000000000000000000000000000000000..0077ef4e0417e0baafcef1ca83dec277
 +    public void addHashedItemStack(Hash128 hash, ItemStack stack) {
 +        synchronized (tags) {
 +            if (tags.get(hash) == null) {
-+                System.out.println("Adding ItemStack hash " + hash.toString());
++                if (abomination.config.BeCarefulReadDocs.NbtDeduplication.verbose)
++                    LOGGER.info("Adding ItemStack hash " + hash.toString());
 +                tags.put(hash, stack);
 +            }
 +        }
@@ -282,7 +284,8 @@ index 0000000000000000000000000000000000000000..0077ef4e0417e0baafcef1ca83dec277
 +
 +            Hash128 hash = Hash128.xxHash128(buf.array());
 +            if (tags.get(hash) == null) {
-+                System.out.println("Adding new ItemStack hash " + hash.toString());
++                if (abomination.config.BeCarefulReadDocs.NbtDeduplication.verbose)
++                    LOGGER.info("Adding new ItemStack hash " + hash.toString());
 +                tags.put(hash, stack);
 +            }
 +            return hash;
@@ -290,7 +293,7 @@ index 0000000000000000000000000000000000000000..0077ef4e0417e0baafcef1ca83dec277
 +    }
 +
 +    public static void deduplicateContainersOnWrite(ChunkPos pos, CompoundTag nbt) {
-+        if (abomination.config.BeCarefulReadDocs.NbtDeduplication.enabled == false) return;
++        if (abomination.config.BeCarefulReadDocs.NbtDeduplication.isEnabled() == false) return;
 +
 +        Object2IntOpenHashMap<Hash128> deduplications = new Object2IntOpenHashMap<>();
 +

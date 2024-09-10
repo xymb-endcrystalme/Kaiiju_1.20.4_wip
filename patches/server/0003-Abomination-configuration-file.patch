@@ -395,6 +395,16 @@ index 0000000000000000000000000000000000000000..88d72da76b6476fdce8ce39cabfe0952
 +
 +public class Reliability {
 +}
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..692e8ae6b37008ea443dd4f7f8e6e3503d62b00b
+--- /dev/null
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class UnsupportedWipOptionsWillChange {
++}
 diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
 index 301d7fa29fce2997a5881b3852896eff5af33672..f677bf4524ea902b100b6b42eb9ef58dbf274cde 100644
 --- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
