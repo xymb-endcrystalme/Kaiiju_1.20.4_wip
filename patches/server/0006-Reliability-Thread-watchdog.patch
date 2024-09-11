@@ -123,12 +123,12 @@ index 0000000000000000000000000000000000000000..cb5b345cc50eb38279fb05128c20fd8c
 +    }
 +}
 diff --git a/src/main/java/abomination/config/Reliability.java b/src/main/java/abomination/config/Reliability.java
-index 7c92166683e9f626c5df53058369aa44ab352624..b405b7d9f2d5c5974500659d30697b979b9eb38b 100644
+index 05e14aaca57a58ab827062263c7ff048ccd9217f..82aeeba5e8ea05c75e07fec3bc9b126dc096426b 100644
 --- a/src/main/java/abomination/config/Reliability.java
 +++ b/src/main/java/abomination/config/Reliability.java
 @@ -3,4 +3,10 @@ package abomination.config;
  public class Reliability {
-     public static int saveMapDataEveryXSeconds = 600; // 0 to disable
+     public static int saveMapDataEverySeconds = 600; // 0 to disable
      public static boolean makeAllPluginEventsSynchronized = false; // Fixes some plugins that claim Folia compatibility, but have multithreading bugs
 +
 +    public static class ThreadStabilityWatchdog {
@@ -180,13 +180,13 @@ index ac56b02498eb38883ae462be6ef3d15cb2a855aa..d4eff6e31f28266aa487396d0058a8b6
                      try {
                          Thread.sleep(Long.MAX_VALUE);
 diff --git a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
-index b35a5c9e45dcc61ee7415f2b7650cdcfd37f1ff6..c1d997a28fc4e8ba50c44764ab5e634300a9b734 100644
+index 6bf0fb78e699a20f70761c6923a23971098915c4..4a3b2d4ee7a9876ef3485532227050d74b72fdb7 100644
 --- a/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
 +++ b/src/main/java/net/minecraft/server/dedicated/DedicatedServer.java
 @@ -317,6 +317,7 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface
          }
  
-         if (abomination.config.Reliability.saveMapDataEveryXSeconds > 0) abomination.MapSaverThread.start(); // Abomination
+         if (abomination.config.Reliability.saveMapDataEverySeconds > 0) abomination.MapSaverThread.start(); // Abomination
 +        abomination.ThreadStabilityWatchdog.start(); // Abomination
  
          if (!OldUsersConverter.serverReadyAfterUserconversion(this)) {

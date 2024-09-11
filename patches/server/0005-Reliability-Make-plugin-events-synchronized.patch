@@ -6,13 +6,13 @@ Subject: [PATCH] Reliability: Make plugin events synchronized.
 To fix some plugins that claim Folia compatibility, but in reality fail at multithreading.
 
 diff --git a/src/main/java/abomination/config/Reliability.java b/src/main/java/abomination/config/Reliability.java
-index 90b54c9f06acd586fd713ec8eb810fb62858207e..7c92166683e9f626c5df53058369aa44ab352624 100644
+index 9b9189b3aaff14ca70b80f2feb48addff2590980..05e14aaca57a58ab827062263c7ff048ccd9217f 100644
 --- a/src/main/java/abomination/config/Reliability.java
 +++ b/src/main/java/abomination/config/Reliability.java
 @@ -2,4 +2,5 @@ package abomination.config;
  
  public class Reliability {
-     public static int saveMapDataEveryXSeconds = 600; // 0 to disable
+     public static int saveMapDataEverySeconds = 600; // 0 to disable
 +    public static boolean makeAllPluginEventsSynchronized = false; // Fixes some plugins that claim Folia compatibility, but have multithreading bugs
  }
 diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
