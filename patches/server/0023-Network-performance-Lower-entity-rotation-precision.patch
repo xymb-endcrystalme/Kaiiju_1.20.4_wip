@@ -5,10 +5,10 @@ Subject: [PATCH] Network performance: Lower entity rotation precision
 
 
 diff --git a/src/main/java/abomination/PacketFirewall.java b/src/main/java/abomination/PacketFirewall.java
-index 052642f326087f3d9ba0f7dac324a9247c1725e1..c37390665d404e8e2e50dc54b655a18a871c5eb8 100644
+index 4d47ab6e5f2e45acb350d06a4fafdc76033086b7..74ad8e0592b7ca8fd946af56883a62ec3d50cc92 100644
 --- a/src/main/java/abomination/PacketFirewall.java
 +++ b/src/main/java/abomination/PacketFirewall.java
-@@ -204,7 +204,7 @@ public class PacketFirewall {
+@@ -169,7 +169,7 @@ public class PacketFirewall {
          if (abomination.config.CoordExploitFirewall.clientbound.packetDistanceLimit <= 0) return true;
  
          if (!packetIsCoordExplotSafe(player, packet)) {
