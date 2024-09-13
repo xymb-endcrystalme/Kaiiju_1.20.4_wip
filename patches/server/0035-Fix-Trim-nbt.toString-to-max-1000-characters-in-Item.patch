@@ -6,7 +6,7 @@ Subject: [PATCH] Fix: Trim nbt.toString() to max 1000 characters in
 
 
 diff --git a/src/main/java/net/minecraft/world/item/ItemStack.java b/src/main/java/net/minecraft/world/item/ItemStack.java
-index 72dcf1188cc6d3d4c000972c4b5691a4da5becec..b8dad338540b734ec19e404b9c1ff57385702af0 100644
+index 72dcf1188cc6d3d4c000972c4b5691a4da5becec..4791b18381e8d9db4321bce746cdd3eea6d360e1 100644
 --- a/src/main/java/net/minecraft/world/item/ItemStack.java
 +++ b/src/main/java/net/minecraft/world/item/ItemStack.java
 @@ -375,7 +375,11 @@ public final class ItemStack implements DataComponentHolder {
@@ -15,8 +15,8 @@ index 72dcf1188cc6d3d4c000972c4b5691a4da5becec..b8dad338540b734ec19e404b9c1ff573
          Optional<ItemStack> stack = ItemStack.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), nbt).resultOrPartial((s) -> {
 -            ItemStack.LOGGER.error("Tried to load invalid item: '{}' " + nbt.toString(), s);
 +            String nbtString = nbt.toString();
-+            if (nbtString.length() > 1000) {
-+                nbtString = nbtString.substring(0, 997) + "...";
++            if (nbtString.length() > 200) {
++                nbtString = nbtString.substring(0, 197) + "...";
 +            }
 +            ItemStack.LOGGER.error("Tried to load invalid item: '{}' " + nbtString, s);
          });
