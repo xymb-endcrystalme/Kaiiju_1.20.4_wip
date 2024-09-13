@@ -4,19 +4,6 @@ Date: Wed, 4 Sep 2024 08:37:38 +0200
 Subject: [PATCH] Network performance: Lower entity rotation precision
 
 
-diff --git a/src/main/java/abomination/PacketFirewall.java b/src/main/java/abomination/PacketFirewall.java
-index 4d47ab6e5f2e45acb350d06a4fafdc76033086b7..74ad8e0592b7ca8fd946af56883a62ec3d50cc92 100644
---- a/src/main/java/abomination/PacketFirewall.java
-+++ b/src/main/java/abomination/PacketFirewall.java
-@@ -169,7 +169,7 @@ public class PacketFirewall {
-         if (abomination.config.CoordExploitFirewall.clientbound.packetDistanceLimit <= 0) return true;
- 
-         if (!packetIsCoordExplotSafe(player, packet)) {
--            if (abomination.config.CoordExploitFirewall.serverbound.verbose)
-+            if (abomination.config.CoordExploitFirewall.clientbound.verbose)
-                 LOGGER.error("PACKET BLOCKED " + packet);
-             return false;
-         }
 diff --git a/src/main/java/abomination/config/Networking.java b/src/main/java/abomination/config/Networking.java
 index 23fb47ad0377762bd5aa237a488677eae8bd56ad..053bf34b5fcb63d673c2424e12fa810e36de82c9 100644
 --- a/src/main/java/abomination/config/Networking.java
