@@ -1,0 +1,20 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 15:02:07 +0200
+Subject: [PATCH] Fix: Prevent "Plugin is getting a faraway chunk" spam when
+ players are at world border.
+
+
+diff --git a/src/main/java/org/bukkit/craftbukkit/CraftWorld.java b/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
+index 6b535d154e33947a85a2fe5b40a241a9d172db84..7881b6ff951908ccdbb7e997e357321b4fb01306 100644
+--- a/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
++++ b/src/main/java/org/bukkit/craftbukkit/CraftWorld.java
+@@ -307,7 +307,7 @@ public class CraftWorld extends CraftRegionAccessor implements World {
+     // Paper start
+     private static void warnUnsafeChunk(String reason, int x, int z) {
+         // if any chunk coord is outside of 30 million blocks
+-        if (x > 1875000 || z > 1875000 || x < -1875000 || z < -1875000) {
++        if (x > 1875033 || z > 1875033 || x < -1875033 || z < -1875033) { // Abomination - add max render distance. Prevents spam when players base at world border.
+             Plugin plugin = io.papermc.paper.util.StackWalkerUtil.getFirstPluginCaller();
+             if (plugin != null) {
+                 plugin.getLogger().warning("Plugin is %s at (%s, %s), this might cause issues.".formatted(reason, x, z));
