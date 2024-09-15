@@ -1,0 +1,47 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 13:19:04 +0200
+Subject: [PATCH] WIP: Mob despawn throttling.
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 856ae66c1fc5a32c06591e457ec2453d39ccd2ea..7e0d29d898816982976a01fca4f9f4322af0ef5f 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -23,4 +23,5 @@ public class UnsupportedWipOptionsWillChange {
+     public static int bedrockBreakingInterval = 10;
+ 
+     public static boolean synchronizeSixBPlugins = false;
++    public static int entityDespawnThrottle = 1;
+ }
+diff --git a/src/main/java/net/minecraft/server/level/ServerLevel.java b/src/main/java/net/minecraft/server/level/ServerLevel.java
+index 7c2b8c066ba40ea84f2f4a2e34ff77ae26ee311e..544ec9e3a54d8bbf183be3873b756f1f1bfdf694 100644
+--- a/src/main/java/net/minecraft/server/level/ServerLevel.java
++++ b/src/main/java/net/minecraft/server/level/ServerLevel.java
+@@ -707,6 +707,8 @@ public class ServerLevel extends Level implements WorldGenLevel, ca.spottedleaf.
+         return this.structureManager;
+     }
+ 
++    private int despawnThrottleCounter = 0; // Abomination
++
+     public void tick(BooleanSupplier shouldKeepTicking, io.papermc.paper.threadedregions.TickRegions.TickRegionData region) { // Folia - regionised ticking
+         final io.papermc.paper.threadedregions.RegionizedWorldData regionizedWorldData = this.getCurrentWorldData(); // Folia - regionised ticking
+         final ca.spottedleaf.leafprofiler.RegionizedProfiler.Handle profiler = io.papermc.paper.threadedregions.TickRegionScheduler.getProfiler(); // Folia - profiler
+@@ -781,6 +783,8 @@ public class ServerLevel extends Level implements WorldGenLevel, ca.spottedleaf.
+             this.resetEmptyTime();
+         }
+ 
++        boolean checkForDespawns = despawnThrottleCounter++ % abomination.config.UnsupportedWipOptionsWillChange.entityDespawnThrottle == 0;
++
+         if (flag1 || this.emptyTime++ < 300) {
+             gameprofilerfiller.push("entities");
+             this.timings.tickEntities.startTiming(); // Spigot
+@@ -811,7 +815,7 @@ public class ServerLevel extends Level implements WorldGenLevel, ca.spottedleaf.
+                         entity.discard();
+                     } else if (!tickratemanager.isEntityFrozen(entity)) {
+                         gameprofilerfiller.push("checkDespawn");
+-                        entity.checkDespawn();
++                        if (checkForDespawns) entity.checkDespawn(); // Abomination
+                         if (entity.isRemoved()) return; // Folia - region threading - if we despawned, DON'T TICK IT!
+                         gameprofilerfiller.pop();
+                         if (true || this.chunkSource.chunkMap.getDistanceManager().inEntityTickingRange(entity.chunkPosition().toLong())) { // Paper - rewrite chunk system

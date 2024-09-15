@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 13:43:49 +0200
+Subject: [PATCH] WIP: disableTickThreadCheckForEntityActivation
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index e5ab1834999b0df923f7890507377845c1c0f8bc..8162a4b79d40720806b3a6e523615db32a947c10 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -25,4 +25,6 @@ public class UnsupportedWipOptionsWillChange {
+     public static boolean synchronizeSixBPlugins = false;
+     public static int entityDespawnThrottle = 1;
+     public static int getGameRulesThrottling = 1;
++
++    public static boolean disableTickThreadCheckForEntityActivation = false;
+ }
+diff --git a/src/main/java/org/spigotmc/ActivationRange.java b/src/main/java/org/spigotmc/ActivationRange.java
+index 91c63c3dceddf09018d3651f4c11bf521eb53ecf..313e3c6cc58c25076d2affcfb66d5c5342e5a56c 100644
+--- a/src/main/java/org/spigotmc/ActivationRange.java
++++ b/src/main/java/org/spigotmc/ActivationRange.java
+@@ -223,7 +223,7 @@ public class ActivationRange
+             for (Entity entity : entities) {
+                 // Paper start - Configurable marker ticking
+                 // Folia start - region ticking
+-                if (!ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(entity)) {
++                if (!abomination.config.UnsupportedWipOptionsWillChange.disableTickThreadCheckForEntityActivation && !ca.spottedleaf.moonrise.common.util.TickThread.isTickThreadFor(entity)) { // Abomination
+                     continue;
+                 }
+                 // Folia end - region ticking

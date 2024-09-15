@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 14:34:27 +0200
+Subject: [PATCH] WIP optimization: Disable minecart push event.
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index b8f4ee56f9d78b6efb5948aa7f32600e7b9e19e8..b4d9df6614cb2bf09a1c9376284106ef7f182024 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -33,4 +33,5 @@ public class UnsupportedWipOptionsWillChange {
+ 
+     public static boolean disableAchievements = false;
+     public static boolean disableVanishPlugins = false;
++    public static boolean disableMinecartPushEvents = false;
+ }
+diff --git a/src/main/java/net/minecraft/world/entity/vehicle/AbstractMinecart.java b/src/main/java/net/minecraft/world/entity/vehicle/AbstractMinecart.java
+index f403fc311a974558233028663dbe14c27b27d3f9..ce2474cf1e18ea69fd7988dd68613316b1bae3f9 100644
+--- a/src/main/java/net/minecraft/world/entity/vehicle/AbstractMinecart.java
++++ b/src/main/java/net/minecraft/world/entity/vehicle/AbstractMinecart.java
+@@ -419,6 +419,7 @@ public abstract class AbstractMinecart extends VehicleEntity {
+                     Entity entity1 = (Entity) iterator1.next();
+ 
+                     if (!this.hasPassenger(entity1) && entity1.isPushable() && entity1 instanceof AbstractMinecart) {
++                        if (!abomination.config.UnsupportedWipOptionsWillChange.disableMinecartPushEvents) { // Abomination
+                         // CraftBukkit start
+                         VehicleEntityCollisionEvent collisionEvent = new VehicleEntityCollisionEvent(vehicle, entity1.getBukkitEntity());
+                         this.level().getCraftServer().getPluginManager().callEvent(collisionEvent);
+@@ -427,6 +428,7 @@ public abstract class AbstractMinecart extends VehicleEntity {
+                             continue;
+                         }
+                         // CraftBukkit end
++                        } // Abomination
+                         entity1.push((Entity) this);
+                     }
+                 }

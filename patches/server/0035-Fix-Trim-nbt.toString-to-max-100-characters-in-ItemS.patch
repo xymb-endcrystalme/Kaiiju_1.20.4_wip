@@ -1,12 +1,12 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: "Xymb (aider)" <xymb@endcrystal.me>
 Date: Fri, 13 Sep 2024 14:43:03 +0200
-Subject: [PATCH] Fix: Trim nbt.toString() to max 1000 characters in
- ItemStack's error message
+Subject: [PATCH] Fix: Trim nbt.toString() to max 100 characters in ItemStack's
+ error message
 
 
 diff --git a/src/main/java/net/minecraft/world/item/ItemStack.java b/src/main/java/net/minecraft/world/item/ItemStack.java
-index 72dcf1188cc6d3d4c000972c4b5691a4da5becec..4791b18381e8d9db4321bce746cdd3eea6d360e1 100644
+index 72dcf1188cc6d3d4c000972c4b5691a4da5becec..00fb606bcf2becd3dc14ee1f23888d35484c99a8 100644
 --- a/src/main/java/net/minecraft/world/item/ItemStack.java
 +++ b/src/main/java/net/minecraft/world/item/ItemStack.java
 @@ -375,7 +375,11 @@ public final class ItemStack implements DataComponentHolder {
@@ -15,8 +15,8 @@ index 72dcf1188cc6d3d4c000972c4b5691a4da5becec..4791b18381e8d9db4321bce746cdd3ee
          Optional<ItemStack> stack = ItemStack.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE), nbt).resultOrPartial((s) -> {
 -            ItemStack.LOGGER.error("Tried to load invalid item: '{}' " + nbt.toString(), s);
 +            String nbtString = nbt.toString();
-+            if (nbtString.length() > 200) {
-+                nbtString = nbtString.substring(0, 197) + "...";
++            if (nbtString.length() > 100) {
++                nbtString = nbtString.substring(0, 97) + "...";
 +            }
 +            ItemStack.LOGGER.error("Tried to load invalid item: '{}' " + nbtString, s);
          });

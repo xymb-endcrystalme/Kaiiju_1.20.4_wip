@@ -1,0 +1,68 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 14:01:49 +0200
+Subject: [PATCH] WIP optimization: Update entity in water throttle.
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 245d8172bd078bc66681deb2031ad7ef75ff0932..8c1e13a77f1efe57a6417b8883a5455b037847ee 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -28,4 +28,5 @@ public class UnsupportedWipOptionsWillChange {
+ 
+     public static boolean disableTickThreadCheckForEntityActivation = false;
+     public static int hardcodeEntityVisibilityRange = 0;
++    public static int updateEntityInWaterThrottling = 1;
+ }
+diff --git a/src/main/java/net/minecraft/world/entity/Entity.java b/src/main/java/net/minecraft/world/entity/Entity.java
+index 0dce7e72a2c5f7360a43b662b43b47603e2aa213..35fd327e880d3848e27eb10c476f4c384fca3bb7 100644
+--- a/src/main/java/net/minecraft/world/entity/Entity.java
++++ b/src/main/java/net/minecraft/world/entity/Entity.java
+@@ -869,6 +869,20 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+     }
+     // CraftBukkit end
+ 
++    // Abomination start
++    public boolean hasHorizontalVelocity() {
++        return Math.abs(this.deltaMovement.x) > 1E-3 || Math.abs(this.deltaMovement.z) > 1E-3;
++    }
++    // Abomination end
++
++    // Abomination start
++    int updateInWaterThrottling = 0;
++    int outOfWaterCounter = 0;
++    int inWaterCounter = 0;
++    int noVelocityCounter = 0;
++    public boolean lastFluidPushingState = false;
++    // Abomination end
++
+     public void baseTick() {
+         this.level().getProfiler().push("entityBaseTick");
+         if (firstTick && this instanceof net.minecraft.world.entity.NeutralMob neutralMob) neutralMob.tickInitialPersistentAnger(level); // Paper - Prevent entity loading causing async lookups
+@@ -891,8 +905,25 @@ public abstract class Entity implements SyncedDataHolder, Nameable, EntityAccess
+ 
+         this.wasInPowderSnow = this.isInPowderSnow;
+         this.isInPowderSnow = false;
+-        this.updateInWaterStateAndDoFluidPushing();
++        // Abomination start
++        if (this.hasHorizontalVelocity()) {
++            noVelocityCounter = 0;
++        } else {
++            noVelocityCounter++;
++        }
++        if (!this.isInWater()) {
++            outOfWaterCounter++;
++            inWaterCounter = 0;
++        } else {
++            outOfWaterCounter = 0;
++            inWaterCounter++;
++        }
++        if (((outOfWaterCounter > 0 && outOfWaterCounter < 40) || (inWaterCounter > 0 && inWaterCounter < 40) || noVelocityCounter < 40) ||
++             updateInWaterThrottling++ % abomination.config.UnsupportedWipOptionsWillChange.updateEntityInWaterThrottling == 0) {
++        if (this instanceof ItemEntity) this.updateInWaterStateAndDoFluidPushing();
++        lastFluidPushingState = this.updateInWaterStateAndDoFluidPushing();
+         this.updateFluidOnEyes();
++        } // Abomination end
+         this.updateSwimming();
+         if (this.level().isClientSide) {
+             this.clearFire();

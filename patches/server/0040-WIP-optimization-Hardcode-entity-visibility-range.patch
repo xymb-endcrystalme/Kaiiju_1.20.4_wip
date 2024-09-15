@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 13:54:07 +0200
+Subject: [PATCH] WIP optimization: Hardcode entity visibility range
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 8162a4b79d40720806b3a6e523615db32a947c10..245d8172bd078bc66681deb2031ad7ef75ff0932 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -27,4 +27,5 @@ public class UnsupportedWipOptionsWillChange {
+     public static int getGameRulesThrottling = 1;
+ 
+     public static boolean disableTickThreadCheckForEntityActivation = false;
++    public static int hardcodeEntityVisibilityRange = 0;
+ }
+diff --git a/src/main/java/net/minecraft/server/level/ChunkMap.java b/src/main/java/net/minecraft/server/level/ChunkMap.java
+index 728454fcfbeddcfe1b0a95e89827f33d7f7838bc..9baa83ed6ac429e8a20085aef939f8027046ddcb 100644
+--- a/src/main/java/net/minecraft/server/level/ChunkMap.java
++++ b/src/main/java/net/minecraft/server/level/ChunkMap.java
+@@ -1246,6 +1246,8 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
+         }
+ 
+         private int getEffectiveRange() {
++            if (abomination.config.UnsupportedWipOptionsWillChange.hardcodeEntityVisibilityRange > 0) return abomination.config.UnsupportedWipOptionsWillChange.hardcodeEntityVisibilityRange; // Abomination
++
+             int i = this.range;
+             Iterator iterator = this.entity.getIndirectPassengers().iterator();
+ 

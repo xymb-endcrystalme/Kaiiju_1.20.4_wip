@@ -1,0 +1,44 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 06:33:38 +0200
+Subject: [PATCH] WIP: Specific plugin synchronization HACK - IMPLEMENT
+ PROPERLY
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 7528ece1d7984ae48041d7ae3cdac50b9cceed3b..856ae66c1fc5a32c06591e457ec2453d39ccd2ea 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -21,4 +21,6 @@ public class UnsupportedWipOptionsWillChange {
+ 
+     public static boolean bedrockBreaking = false;
+     public static int bedrockBreakingInterval = 10;
++
++    public static boolean synchronizeSixBPlugins = false;
+ }
+diff --git a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
+index 1b5ec4e11eaa4ec837ef4c64af48cd3acc379d2b..cd00ebd04b2af6d88a07d7536d759a9749b8f769 100644
+--- a/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
++++ b/src/main/java/io/papermc/paper/plugin/manager/PaperEventManager.java
+@@ -52,11 +52,19 @@ class PaperEventManager {
+             }
+ 
+             try {
+-                // Abomination start
++                // Abomination start - broken plugin synchronization
+                 if (abomination.config.Reliability.makeAllPluginEventsSynchronized) {
+-                    synchronized (lock) { // Abomination - never run plugins async
++                    synchronized (lock) { // Abomination
+                         registration.callEvent(event);
+                     }
++                } else if (abomination.config.UnsupportedWipOptionsWillChange.synchronizeSixBPlugins) {
++                        String name = registration.getPlugin().getName();
++                        if (name.contains("NoCheatPlus") || name.contains("Hotspot")) {
++                            synchronized (lock) { // Abomination - never run plugins async
++                                registration.callEvent(event);
++                            }
++                        }
++                        else registration.callEvent(event);
+                 } else
+                 // Abomination end
+                 registration.callEvent(event);

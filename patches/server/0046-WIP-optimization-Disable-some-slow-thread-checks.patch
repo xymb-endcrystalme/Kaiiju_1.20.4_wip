@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 14:37:15 +0200
+Subject: [PATCH] WIP optimization: Disable some slow thread checks.
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index b4d9df6614cb2bf09a1c9376284106ef7f182024..dc7f6c30987a7d2208016717950edd8fab004e6c 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -34,4 +34,5 @@ public class UnsupportedWipOptionsWillChange {
+     public static boolean disableAchievements = false;
+     public static boolean disableVanishPlugins = false;
+     public static boolean disableMinecartPushEvents = false;
++    public static boolean disableSomeSlowThreadChecks = false;
+ }
+diff --git a/src/main/java/ca/spottedleaf/moonrise/patches/chunk_system/player/RegionizedPlayerChunkLoader.java b/src/main/java/ca/spottedleaf/moonrise/patches/chunk_system/player/RegionizedPlayerChunkLoader.java
+index 433abf4237f698872db0e07d92b680408109d470..d7d76f64891ebb7276c79911020e0724d5c3a401 100644
+--- a/src/main/java/ca/spottedleaf/moonrise/patches/chunk_system/player/RegionizedPlayerChunkLoader.java
++++ b/src/main/java/ca/spottedleaf/moonrise/patches/chunk_system/player/RegionizedPlayerChunkLoader.java
+@@ -901,7 +901,7 @@ public final class RegionizedPlayerChunkLoader {
+         }
+ 
+         void update() {
+-            TickThread.ensureTickThread(this.player, "Cannot update player asynchronously");
++            if (!abomination.config.UnsupportedWipOptionsWillChange.disableSomeSlowThreadChecks) TickThread.ensureTickThread(this.player, "Cannot update player asynchronously");
+             if (this.removed) {
+                 throw new IllegalStateException("Updating removed player chunk loader");
+             }

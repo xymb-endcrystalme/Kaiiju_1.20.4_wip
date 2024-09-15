@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 14:39:50 +0200
+Subject: [PATCH] WIP optimization: Disable player arm swing.
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index dc7f6c30987a7d2208016717950edd8fab004e6c..74e5051fddf39aec30dfb1e6095f5f3c0c3b91cb 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -35,4 +35,5 @@ public class UnsupportedWipOptionsWillChange {
+     public static boolean disableVanishPlugins = false;
+     public static boolean disableMinecartPushEvents = false;
+     public static boolean disableSomeSlowThreadChecks = false;
++    public static boolean disablePlayerArmSwingEvent = false;
+ }
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index 99dd1de09859dc788a711048720f68212e7fe4ee..fc7f8058199dbe17d9153bd8500e985d627ff192 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -2706,6 +2706,7 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+         PacketUtils.ensureRunningOnSameThread(packet, this, this.player.serverLevel());
+         if (this.player.isImmobile()) return; // CraftBukkit
+         this.player.resetLastActionTime();
++        if (!abomination.config.UnsupportedWipOptionsWillChange.disablePlayerArmSwingEvent) { // Abomination
+         // CraftBukkit start - Raytrace to look for 'rogue armswings'
+         float f1 = this.player.getXRot();
+         float f2 = this.player.getYRot();
+@@ -2738,6 +2739,7 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+ 
+         if (event.isCancelled()) return;
+         // CraftBukkit end
++        } // Abomination
+         this.player.swing(packet.getHand());
+         if (abomination.config.UnsupportedWipOptionsWillChange.bedrockBreaking) testBreaking(); // Abomination
+     }

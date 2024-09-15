@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 14:23:54 +0200
+Subject: [PATCH] WIP optimization: Disable achievements
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 592e5efdd1b28d8d51fcac6e2c2c70f1174d0cac..fe7be26f208aa25503cbe675d686bb8ce665e426 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -30,4 +30,6 @@ public class UnsupportedWipOptionsWillChange {
+     public static int hardcodeEntityVisibilityRange = 0;
+     public static int updateEntityInWaterThrottling = 1;
+     public static boolean speedupGetNearestEntity = false;
++
++    public static boolean disableAchievements = false;
+ }
+diff --git a/src/main/java/net/minecraft/advancements/critereon/SimpleCriterionTrigger.java b/src/main/java/net/minecraft/advancements/critereon/SimpleCriterionTrigger.java
+index 35772110e9318df46a2729dbc0b5879b290011b7..95f8d34ce669ac3ef55dfacaf4c420a8a396c003 100644
+--- a/src/main/java/net/minecraft/advancements/critereon/SimpleCriterionTrigger.java
++++ b/src/main/java/net/minecraft/advancements/critereon/SimpleCriterionTrigger.java
+@@ -39,6 +39,7 @@ public abstract class SimpleCriterionTrigger<T extends SimpleCriterionTrigger.Si
+     }
+ 
+     protected void trigger(ServerPlayer player, Predicate<T> predicate) {
++        if (abomination.config.UnsupportedWipOptionsWillChange.disableAchievements) return; // Abomination
+         PlayerAdvancements playerAdvancements = player.getAdvancements();
+         Set<CriterionTrigger.Listener<T>> set = (Set) playerAdvancements.criterionData.get(this); // Paper - fix AdvancementDataPlayer leak
+         if (set != null && !set.isEmpty()) {

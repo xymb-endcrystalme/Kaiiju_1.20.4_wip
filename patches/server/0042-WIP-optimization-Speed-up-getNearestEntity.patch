@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 14:13:39 +0200
+Subject: [PATCH] WIP optimization: Speed up getNearestEntity.
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 8c1e13a77f1efe57a6417b8883a5455b037847ee..592e5efdd1b28d8d51fcac6e2c2c70f1174d0cac 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -29,4 +29,5 @@ public class UnsupportedWipOptionsWillChange {
+     public static boolean disableTickThreadCheckForEntityActivation = false;
+     public static int hardcodeEntityVisibilityRange = 0;
+     public static int updateEntityInWaterThrottling = 1;
++    public static boolean speedupGetNearestEntity = false;
+ }
+diff --git a/src/main/java/net/minecraft/world/level/EntityGetter.java b/src/main/java/net/minecraft/world/level/EntityGetter.java
+index 435559deef77c67875511fed63595ce2db274df1..4e33c8bf8ca99df486731a1a3b60b5f26263586a 100644
+--- a/src/main/java/net/minecraft/world/level/EntityGetter.java
++++ b/src/main/java/net/minecraft/world/level/EntityGetter.java
+@@ -231,6 +231,7 @@ public interface EntityGetter extends ca.spottedleaf.moonrise.patches.chunk_syst
+         List<? extends T> entityList, TargetingConditions targetPredicate, @Nullable LivingEntity entity, double x, double y, double z
+     ) {
+         double d = -1.0;
++        if (abomination.config.UnsupportedWipOptionsWillChange.speedupGetNearestEntity) d = 128 * 128; // Abomination
+         T livingEntity = null;
+ 
+         for (T livingEntity2 : entityList) {

@@ -1,0 +1,59 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 13:35:16 +0200
+Subject: [PATCH] WIP: Game rules throttling.
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 7e0d29d898816982976a01fca4f9f4322af0ef5f..e5ab1834999b0df923f7890507377845c1c0f8bc 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -24,4 +24,5 @@ public class UnsupportedWipOptionsWillChange {
+ 
+     public static boolean synchronizeSixBPlugins = false;
+     public static int entityDespawnThrottle = 1;
++    public static int getGameRulesThrottling = 1;
+ }
+diff --git a/src/main/java/net/minecraft/server/level/ServerChunkCache.java b/src/main/java/net/minecraft/server/level/ServerChunkCache.java
+index 135fa024d81b962761f0edc6896a2a507b6981f9..552777796331bbdb7c5f835e7dc4d66105be3863 100644
+--- a/src/main/java/net/minecraft/server/level/ServerChunkCache.java
++++ b/src/main/java/net/minecraft/server/level/ServerChunkCache.java
+@@ -424,6 +424,12 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+         this.clearCache();
+     }
+ 
++    // Abomination start
++    int getGameRulesThrottling = 0;
++    int randomTickingMemory = 0;
++    boolean doMobSpawningMemory = false;
++    // Abomination end
++
+     private void tickChunks() {
+         io.papermc.paper.threadedregions.RegionizedWorldData regionizedWorldData = this.level.getCurrentWorldData(); // Folia - region threading
+         final ca.spottedleaf.leafprofiler.RegionizedProfiler.Handle profiler = io.papermc.paper.threadedregions.TickRegionScheduler.getProfiler(); // Folia - profiler
+@@ -496,7 +502,11 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+ 
+                 regionizedWorldData.lastSpawnState = spawnercreature_d; // Folia - region threading
+                 gameprofilerfiller.popPush("spawnAndTick");
+-                boolean flag = this.level.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING) && !this.level.getLocalPlayers().isEmpty(); // CraftBukkit // Folia - region threadin
++                // Abomination start
++                if (getGameRulesThrottling % (abomination.config.UnsupportedWipOptionsWillChange.getGameRulesThrottling + 1) == 0)
++                    doMobSpawningMemory = this.level.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING);
++                boolean flag = doMobSpawningMemory && !regionizedWorldData.getLocalPlayers().isEmpty(); // CraftBukkit // Folia - region threading
++                // Abomination end
+ 
+                 if (!this.level.paperConfig().entities.spawning.perPlayerMobSpawns) Util.shuffle(list, this.level.random); // Paper - per player mob spawns - do not need this when per-player is enabled
+                 // Paper start - PlayerNaturallySpawnCreaturesEvent
+@@ -508,7 +518,11 @@ public class ServerChunkCache extends ChunkSource implements ca.spottedleaf.moon
+                     entityPlayer.playerNaturallySpawnedEvent.callEvent();
+                 }
+                 // Paper end - PlayerNaturallySpawnCreaturesEvent
+-                int l = this.level.getGameRules().getInt(GameRules.RULE_RANDOMTICKING);
++                // Abomination start
++                if (getGameRulesThrottling++ % (abomination.config.UnsupportedWipOptionsWillChange.getGameRulesThrottling + 1) == 0)
++                    randomTickingMemory = this.level.getGameRules().getInt(GameRules.RULE_RANDOMTICKING);
++                int l = randomTickingMemory;
++                // Abomination end
+                 boolean flag1 = this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) != 0L && this.level.getLevelData().getGameTime() % this.level.ticksPerSpawnCategory.getLong(org.bukkit.entity.SpawnCategory.ANIMAL) == 0L; // CraftBukkit
+                 Iterator iterator1 = list.iterator();
+ 
