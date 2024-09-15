@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 17:56:40 +0200
+Subject: [PATCH] WIP: Hide "Rejecting UseItemOnPacket" spam on the console.
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 18c97109360cec56ca86cce3e2df2a198c4983d0..b32f6980f64e9898a004a1e19fed201bfee4885b 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -38,4 +38,5 @@ public class UnsupportedWipOptionsWillChange {
+     public static boolean disablePlayerArmSwingEvent = false;
+ 
+     public static boolean disablePlayerHiding = false;
++    public static boolean hideRejectingUseItemOnPacketMessages = false;
+ }
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index fc7f8058199dbe17d9153bd8500e985d627ff192..1d306b9390e2bac257e5b58daafba772d3957ac9 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -2098,6 +2098,7 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+                     this.player.connection.send(new ClientboundBlockUpdatePacket(worldserver, blockposition));
+                     this.player.connection.send(new ClientboundBlockUpdatePacket(worldserver, blockposition.relative(enumdirection)));
+                 } else {
++                    if (!abomination.config.UnsupportedWipOptionsWillChange.hideRejectingUseItemOnPacketMessages) // Abomination
+                     ServerGamePacketListenerImpl.LOGGER.warn("Rejecting UseItemOnPacket from {}: Location {} too far away from hit block {}.", new Object[]{this.player.getGameProfile().getName(), vec3d, blockposition});
+                 }
+             }

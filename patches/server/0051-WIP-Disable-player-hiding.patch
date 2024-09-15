@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 17:55:40 +0200
+Subject: [PATCH] WIP: Disable player hiding
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 74e5051fddf39aec30dfb1e6095f5f3c0c3b91cb..18c97109360cec56ca86cce3e2df2a198c4983d0 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -36,4 +36,6 @@ public class UnsupportedWipOptionsWillChange {
+     public static boolean disableMinecartPushEvents = false;
+     public static boolean disableSomeSlowThreadChecks = false;
+     public static boolean disablePlayerArmSwingEvent = false;
++
++    public static boolean disablePlayerHiding = false;
+ }
+diff --git a/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java b/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
+index 28c6923c90ca106256ca75769828cd62d5542ca7..1592f63faba2d6aad7c7488a2f4045349d6117a7 100644
+--- a/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
++++ b/src/main/java/org/bukkit/craftbukkit/entity/CraftPlayer.java
+@@ -2006,12 +2006,12 @@ public class CraftPlayer extends CraftHumanEntity implements Player {
+     @Override
+     @Deprecated
+     public void hidePlayer(Player player) {
+-        this.hideEntity0(null, player);
++        if (!abomination.config.UnsupportedWipOptionsWillChange.disablePlayerHiding) this.hideEntity0(null, player); // Abomination
+     }
+ 
+     @Override
+     public void hidePlayer(Plugin plugin, Player player) {
+-        this.hideEntity(plugin, player);
++        if (!abomination.config.UnsupportedWipOptionsWillChange.disablePlayerHiding) this.hideEntity(plugin, player); // Abomination
+     }
+ 
+     @Override

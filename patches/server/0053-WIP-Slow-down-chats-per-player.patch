@@ -1,0 +1,39 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 17:59:05 +0200
+Subject: [PATCH] WIP: Slow down chats per player
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index b32f6980f64e9898a004a1e19fed201bfee4885b..0c8e7a7a6df380b0548a158a7edd4c3e008e610b 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -39,4 +39,5 @@ public class UnsupportedWipOptionsWillChange {
+ 
+     public static boolean disablePlayerHiding = false;
+     public static boolean hideRejectingUseItemOnPacketMessages = false;
++    public static int chatSlowdownPerPlayer = 0;
+ }
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index 1d306b9390e2bac257e5b58daafba772d3957ac9..f919f7246cba96df1357ca6e6656a998af31fb42 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -2289,8 +2289,18 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+         }
+     }
+ 
++    long lastChat = 0; // Abomination
++
+     @Override
+     public void handleChat(ServerboundChatPacket packet) {
++        // Kaiiju start
++        if (abomination.config.UnsupportedWipOptionsWillChange.chatSlowdownPerPlayer > 0) {
++            if (System.currentTimeMillis() - lastChat < abomination.config.UnsupportedWipOptionsWillChange.chatSlowdownPerPlayer) {
++                return;
++            }
++            lastChat = System.currentTimeMillis();
++        }
++        // Kaiiju end
+         // CraftBukkit start - async chat
+         // SPIGOT-3638
+         if (this.server.isStopped()) {
