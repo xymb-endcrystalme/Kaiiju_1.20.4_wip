@@ -1,0 +1,209 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Sun, 15 Sep 2024 17:53:14 +0200
+Subject: [PATCH] WIP: Linear manager
+
+
+diff --git a/src/main/java/abomination/LinearManager.java b/src/main/java/abomination/LinearManager.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..6c3010a05b686c2b8d2e6d7c3ff265666a72d430
+--- /dev/null
++++ b/src/main/java/abomination/LinearManager.java
+@@ -0,0 +1,97 @@
++package abomination;
++
++import it.unimi.dsi.fastutil.objects.ObjectArrayList;
++import java.util.concurrent.ArrayBlockingQueue;
++
++public class LinearManager extends Thread {
++    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
++
++    private boolean close = false;
++
++    private LinearManager(String name) {
++        super(name);
++    }
++
++    public static LinearManager instance = new LinearManager("LinearManager");
++    public final int WORKERS = 6;
++    public final int SAVE_INTERVAL = 10;
++    public final int FLUSH_INTERVAL = 60;
++    Worker[] workers = new Worker[WORKERS];
++
++    public final ObjectArrayList<LinearRegionFile> regionCache = new ObjectArrayList();
++    public final ArrayBlockingQueue<LinearRegionFile> toFlush = new ArrayBlockingQueue(1000);
++
++    boolean started = false;
++
++    public void begin() {
++        if (!started) {
++            synchronized(instance) {
++                if (!started) {
++                    started = true;
++                    for (int i = 0 ; i < WORKERS ; i++) {
++                        workers[i] = new Worker("LinearManagerWorker - " + String.valueOf(i));
++                        workers[i].setPriority(Thread.NORM_PRIORITY - 3);
++                        workers[i].start();
++                    }
++                    this.start();
++                }
++            }
++        }
++    }
++
++    public void addRegion(LinearRegionFile region) {
++        synchronized(regionCache) {
++            regionCache.add(region);
++        }
++    }
++
++    public void run() {
++        while (!close) {
++            synchronized(regionCache) {
++                long timestamp = System.currentTimeMillis();
++                for (int i = 0 ; i < regionCache.size() ; i++) {
++                    LinearRegionFile file = regionCache.get(i);
++                    if (file.close) {
++                        if (abomination.config.UnsupportedWipOptionsWillChange.linearVerbose)
++                            LOGGER.info("Region file marking to remove " + file + " lastRead: " + ((timestamp - file.lastRead) / 1000.) + " lastWrite: " + ((timestamp - file.lastWrite) / 1000.) + " lastFlush: " + ((timestamp - file.lastFlush) / 1000.));
++                        regionCache.remove(i);
++                    } else {
++                        try {
++                            if (file.markedToSave && ((timestamp - file.lastWrite) / 1000. > SAVE_INTERVAL || (timestamp - file.lastFlush) / 1000. > FLUSH_INTERVAL)) {
++                                if (abomination.config.UnsupportedWipOptionsWillChange.linearVerbose)
++                                    LOGGER.info("Region file marking to save " + file + " lastRead: " + ((timestamp - file.lastRead) / 1000.) + " lastWrite: " + ((timestamp - file.lastWrite) / 1000.) + " lastFlush: " + ((timestamp - file.lastFlush) / 1000.));
++                                toFlush.add(file);
++                            }
++                        } catch(IllegalStateException ex) {
++                            LOGGER.info("Linear is too slow for this machine! Backlog full!");
++                            break;
++                        }
++                    }
++                }
++            }
++
++            try { Thread.sleep(100); } catch(InterruptedException ignored) {}
++        }
++    }
++
++    class Worker extends Thread {
++        private Worker(String name) {
++            super(name);
++        }
++
++        boolean close = false;
++
++        public void run() {
++            while (!close) {
++//                if (toFlush.size() > 0) LOGGER.info("Worker thread yea! " + toFlush.size());
++                while (toFlush.size() > 0) {
++                    LinearRegionFile file = toFlush.poll();
++                    if (file == null) break;
++                    file.flushCatch();
++                }
++                try { Thread.sleep(100); } catch(InterruptedException ignored) {}
++            }
++        }
++    }
++
++}
+diff --git a/src/main/java/abomination/LinearRegionFile.java b/src/main/java/abomination/LinearRegionFile.java
+index 92bb140c4cb290b1872b745c8101097fec18f644..a489c45469dc34a38ac9412e09cccd7be9a1ab32 100644
+--- a/src/main/java/abomination/LinearRegionFile.java
++++ b/src/main/java/abomination/LinearRegionFile.java
+@@ -43,8 +43,8 @@ public class LinearRegionFile extends Thread {
+     private final LZ4Compressor compressor;
+     private final LZ4FastDecompressor decompressor;
+ 
+-    private boolean markedToSave = false;
+-    private boolean close = false;
++    public boolean markedToSave = false;
++    public boolean close = false;
+ 
+     public final ReentrantLock fileLock = new ReentrantLock(true);
+     public Path regionFile;
+@@ -117,11 +117,12 @@ public class LinearRegionFile extends Thread {
+     private synchronized void openRegionFile() {
+         if (regionFileOpen) return;
+         regionFileOpen = true;
++        LinearManager.instance.begin();
+ 
+         File regionFile = new File(this.regionFile.toString());
+ 
+         if(!regionFile.canRead()) {
+-            this.start();
++//            this.start();
+             return;
+         }
+ 
+@@ -142,7 +143,8 @@ public class LinearRegionFile extends Thread {
+                 throw new RuntimeException("Invalid version: " + version + " file " + this.regionFile);
+             }
+ 
+-            this.start();
++//            this.start();
++            LinearManager.instance.addRegion(this);
+         } catch (IOException e) {
+             throw new RuntimeException("Failed to open region file " + this.regionFile, e);
+         }
+@@ -305,14 +307,18 @@ public class LinearRegionFile extends Thread {
+         throw new Exception("doesChunkExist is a stub");
+     }
+ 
++    public long lastFlush = System.currentTimeMillis();
++    public long lastWrite = System.currentTimeMillis();
++    public long lastRead = System.currentTimeMillis();
++
+     public synchronized void flush() throws IOException {
+         if(!isMarkedToSave()) return;
+ 
+         openRegionFile();
+ 
+         long timestamp = getTimestamp();
++        lastFlush = System.currentTimeMillis();
+ 
+-long writeStart = System.nanoTime();
+         File tempFile = new File(regionFile.toString() + ".tmp");
+         FileOutputStream fileStream = new FileOutputStream(tempFile);
+         DataOutputStream dataStream = new DataOutputStream(fileStream);
+@@ -431,6 +437,7 @@ long writeStart = System.nanoTime();
+ 
+     public synchronized void write(ChunkPos pos, ByteBuffer buffer) {
+         openRegionFile();
++        lastWrite = System.currentTimeMillis();
+         openBucket(pos.x, pos.z);
+         try {
+             byte[] b = toByteArray(new ByteArrayInputStream(buffer.array()));
+@@ -493,6 +500,7 @@ long writeStart = System.nanoTime();
+     @Nullable
+     public synchronized DataInputStream getChunkDataInputStream(ChunkPos pos) {
+         openRegionFile();
++        lastRead = System.currentTimeMillis();
+         openBucket(pos.x, pos.z);
+ 
+         if(this.bufferUncompressedSize[getChunkIndex(pos.x, pos.z)] != 0) {
+@@ -529,6 +537,13 @@ long writeStart = System.nanoTime();
+         }
+     }
+ 
++    public synchronized void flushCatch() {
++        try {
++            flush();
++        } catch(IOException e) {
++        }
++    }
++
+     private static int getChunkIndex(int x, int z) {
+         return (x & 31) + ((z & 31) << 5);
+     }
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 0c8e7a7a6df380b0548a158a7edd4c3e008e610b..ec1fdfd66655af8171069378693db6538ebb4ce6 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -40,4 +40,6 @@ public class UnsupportedWipOptionsWillChange {
+     public static boolean disablePlayerHiding = false;
+     public static boolean hideRejectingUseItemOnPacketMessages = false;
+     public static int chatSlowdownPerPlayer = 0;
++
++    public static boolean linearVerbose = false;
+ }
