@@ -1,0 +1,63 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Mon, 16 Sep 2024 04:56:00 +0200
+Subject: [PATCH] linear
+
+
+diff --git a/src/main/java/abomination/LinearManager.java b/src/main/java/abomination/LinearManager.java
+index 0136bf342ffc3ead54c928735a180a3a0d5df392..87cd2ea10ff1967199fd0f7faed3c4fa402591b7 100644
+--- a/src/main/java/abomination/LinearManager.java
++++ b/src/main/java/abomination/LinearManager.java
+@@ -55,28 +55,28 @@ public class LinearManager extends Thread {
+ 
+     public void run() {
+         while (!close) {
+-            synchronized(regionCache) {
+-                long timestamp = System.currentTimeMillis();
+-
+-                if (timestamp - lastReport > 60000 && abomination.config.UnsupportedWipOptionsWillChange.linearVerbose) {
+-                    LOGGER.info("regionCache: " + regionCache.size() + " toFlush: " + toFlush.size() + " addedRegions: " + addedRegions + " toFlushCount: " + toFlushCount + " removedCount: " + removedCount);
+-                    addedRegions = 0;
+-                    toFlushCount = 0;
+-                    removedCount = 0;
+-                    lastReport = timestamp;
+-                }
++            long timestamp = System.currentTimeMillis();
++
++            if (timestamp - lastReport > 60000 && abomination.config.UnsupportedWipOptionsWillChange.linearVerbose) {
++                LOGGER.info("regionCache: " + regionCache.size() + " toFlush: " + toFlush.size() + " addedRegions: " + addedRegions + " toFlushCount: " + toFlushCount + " removedCount: " + removedCount);
++                addedRegions = 0;
++                toFlushCount = 0;
++                removedCount = 0;
++                lastReport = timestamp;
++            }
+ 
++            synchronized(regionCache) {
+                 for (int i = 0 ; i < regionCache.size() ; i++) {
+                     LinearRegionFile file = regionCache.get(i);
+                     if (file.close) {
+-                        if (abomination.config.UnsupportedWipOptionsWillChange.linearVerbose)
++                        if (abomination.config.UnsupportedWipOptionsWillChange.linearVeryVerbose)
+                             LOGGER.info("Region file marking to remove " + file + " lastRead: " + ((timestamp - file.lastRead) / 1000.) + " lastWrite: " + ((timestamp - file.lastWrite) / 1000.) + " lastFlush: " + ((timestamp - file.lastFlush) / 1000.));
+                         regionCache.remove(i);
+                         removedCount++;
+                     } else {
+                         try {
+                             if (file.markedToSave && ((timestamp - file.lastWrite) / 1000. > SAVE_INTERVAL || (timestamp - file.lastFlush) / 1000. > FLUSH_INTERVAL)) {
+-                                if (abomination.config.UnsupportedWipOptionsWillChange.linearVerbose)
++                                if (abomination.config.UnsupportedWipOptionsWillChange.linearVeryVerbose)
+                                     LOGGER.info("Region file marking to save " + file + " lastRead: " + ((timestamp - file.lastRead) / 1000.) + " lastWrite: " + ((timestamp - file.lastWrite) / 1000.) + " lastFlush: " + ((timestamp - file.lastFlush) / 1000.));
+                                 toFlush.add(file);
+                                 toFlushCount++;
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index b0d7f03bddd3b0e1f5f3b0130e748cedd4d27ba2..81b04b0c4b1cd82d3af81e927f9c2b35749ae550 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -42,6 +42,7 @@ public class UnsupportedWipOptionsWillChange {
+     public static int chatSlowdownPerPlayer = 0;
+ 
+     public static boolean linearVerbose = false;
++    public static boolean linearVeryVerbose = false;
+     public static int linearManagerThreads = 6;
+     public static int linearSaveInterval = 30;
+     public static int linearFlushInterval = 60;

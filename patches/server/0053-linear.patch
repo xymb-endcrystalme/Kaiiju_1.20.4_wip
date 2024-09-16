@@ -1,0 +1,48 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Mon, 16 Sep 2024 04:16:36 +0200
+Subject: [PATCH] linear
+
+
+diff --git a/src/main/java/abomination/LinearManager.java b/src/main/java/abomination/LinearManager.java
+index 6c3010a05b686c2b8d2e6d7c3ff265666a72d430..3f5eed124e453dce2f4d39a62cd96e38aa2faec5 100644
+--- a/src/main/java/abomination/LinearManager.java
++++ b/src/main/java/abomination/LinearManager.java
+@@ -13,10 +13,9 @@ public class LinearManager extends Thread {
+     }
+ 
+     public static LinearManager instance = new LinearManager("LinearManager");
+-    public final int WORKERS = 6;
+-    public final int SAVE_INTERVAL = 10;
+-    public final int FLUSH_INTERVAL = 60;
+-    Worker[] workers = new Worker[WORKERS];
++    public final int SAVE_INTERVAL = abomination.config.UnsupportedWipOptionsWillChange.linearSaveInterval;
++    public final int FLUSH_INTERVAL = abomination.config.UnsupportedWipOptionsWillChange.linearFlushInterval;
++    Worker[] workers = null;
+ 
+     public final ObjectArrayList<LinearRegionFile> regionCache = new ObjectArrayList();
+     public final ArrayBlockingQueue<LinearRegionFile> toFlush = new ArrayBlockingQueue(1000);
+@@ -28,7 +27,10 @@ public class LinearManager extends Thread {
+             synchronized(instance) {
+                 if (!started) {
+                     started = true;
+-                    for (int i = 0 ; i < WORKERS ; i++) {
++                    int workerNo = abomination.config.UnsupportedWipOptionsWillChange.linearManagerThreads;
++                    if (workerNo < 1) workerNo = 1;
++                    workers = new Worker[workerNo];
++                    for (int i = 0 ; i < workers.length ; i++) {
+                         workers[i] = new Worker("LinearManagerWorker - " + String.valueOf(i));
+                         workers[i].setPriority(Thread.NORM_PRIORITY - 3);
+                         workers[i].start();
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index ec1fdfd66655af8171069378693db6538ebb4ce6..876ae004f97e7f89265ea997c70af775a33a0289 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -42,4 +42,7 @@ public class UnsupportedWipOptionsWillChange {
+     public static int chatSlowdownPerPlayer = 0;
+ 
+     public static boolean linearVerbose = false;
++    public static int linearManagerThreads = 6;
++    public static int linearSaveInterval = 10;
++    public static int linearFlushInterval = 60;
+ }

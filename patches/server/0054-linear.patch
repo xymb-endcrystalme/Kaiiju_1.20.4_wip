@@ -1,0 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Mon, 16 Sep 2024 04:33:08 +0200
+Subject: [PATCH] linear
+
+
+diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+index 876ae004f97e7f89265ea997c70af775a33a0289..b0d7f03bddd3b0e1f5f3b0130e748cedd4d27ba2 100644
+--- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
++++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
+@@ -43,6 +43,6 @@ public class UnsupportedWipOptionsWillChange {
+ 
+     public static boolean linearVerbose = false;
+     public static int linearManagerThreads = 6;
+-    public static int linearSaveInterval = 10;
++    public static int linearSaveInterval = 30;
+     public static int linearFlushInterval = 60;
+ }
