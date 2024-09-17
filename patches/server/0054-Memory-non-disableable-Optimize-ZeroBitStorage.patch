@@ -1,0 +1,52 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Tue, 17 Sep 2024 02:59:36 +0200
+Subject: [PATCH] Memory non-disableable: Optimize ZeroBitStorage
+
+
+diff --git a/src/main/java/net/minecraft/util/ZeroBitStorage.java b/src/main/java/net/minecraft/util/ZeroBitStorage.java
+index 15c5164d0ef41a978c16ee317fa73e97f2480207..7b5ad39e999a3d9a45fae425fcebbf8af8ad7305 100644
+--- a/src/main/java/net/minecraft/util/ZeroBitStorage.java
++++ b/src/main/java/net/minecraft/util/ZeroBitStorage.java
+@@ -8,6 +8,19 @@ public class ZeroBitStorage implements BitStorage {
+     public static final long[] RAW = new long[0];
+     private final int size;
+ 
++    // Abomination start
++    private static final it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap<ZeroBitStorage> generatedZeroBitStorage = new it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap(32);
++
++    public final static ZeroBitStorage factory(int size) {
++        ZeroBitStorage value = generatedZeroBitStorage.get(size);
++        if (value == null) {
++            value = new ZeroBitStorage(size);
++            generatedZeroBitStorage.put(size, value);
++        }
++        return value;
++    }
++    // Abomination end
++
+     public ZeroBitStorage(int size) {
+         this.size = size;
+     }
+diff --git a/src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java b/src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java
+index 13d3c877b006a4975e7370713e3919c661e7890f..6d3b5ec2d4f28d68ee24b0abaef11d4c55ef6926 100644
+--- a/src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java
++++ b/src/main/java/net/minecraft/world/level/chunk/PalettedContainer.java
+@@ -272,7 +272,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
+         PalettedContainer.Configuration<T> configuration = paletteProvider.getConfiguration(idList, j);
+         BitStorage bitStorage;
+         if (j == 0) {
+-            bitStorage = new ZeroBitStorage(i);
++            bitStorage = ZeroBitStorage.factory(i); // Abomination - memory optimization
+         } else {
+             Optional<LongStream> optional = serialized.storage();
+             if (optional.isEmpty()) {
+@@ -375,7 +375,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
+ 
+     static record Configuration<T>(Palette.Factory factory, int bits) {
+         public PalettedContainer.Data<T> createData(IdMap<T> idList, PaletteResize<T> listener, int size) {
+-            BitStorage bitStorage = (BitStorage)(this.bits == 0 ? new ZeroBitStorage(size) : new SimpleBitStorage(this.bits, size));
++            BitStorage bitStorage = (BitStorage)(this.bits == 0 ? ZeroBitStorage.factory(size) : new SimpleBitStorage(this.bits, size)); // Abomination - memory optimization
+             Palette<T> palette = this.factory.create(this.bits, idList, listener, List.of());
+             return new PalettedContainer.Data<>(this, bitStorage, palette);
+         }
