@@ -1,0 +1,69 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Tue, 17 Sep 2024 07:02:24 +0200
+Subject: [PATCH] Memory optimization: ChunkHolder lazy initialize
+ changedBlocksPerSection.
+
+Paper heap shows no memory saved. :shrug:
+
+diff --git a/src/main/java/net/minecraft/server/level/ChunkHolder.java b/src/main/java/net/minecraft/server/level/ChunkHolder.java
+index 409ecea1e03ace2e2c45a1726b5b2d142d058ba1..d8199875fde46c0e2a4deea79b8867fd75894b8d 100644
+--- a/src/main/java/net/minecraft/server/level/ChunkHolder.java
++++ b/src/main/java/net/minecraft/server/level/ChunkHolder.java
+@@ -39,7 +39,7 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     private final LevelHeightAccessor levelHeightAccessor;
+     // Paper - rewrite chunk system
+     private boolean hasChangedSections;
+-    private final ShortSet[] changedBlocksPerSection;
++    private ShortSet[] changedBlocksPerSection = null; // Abomination
+     private BitSet blockChangedLightSectionFilter = null; // Abomination
+     private BitSet skyChangedLightSectionFilter = null; // Abomination
+     private final LevelLightEngine lightEngine;
+@@ -148,6 +148,10 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     private void skyChangedLightSectionFilterPrepare() {
+         if (this.skyChangedLightSectionFilter == null) this.skyChangedLightSectionFilter = new BitSet();
+     }
++
++    private void changedBlocksPerSectionPrepare() {
++        if (this.changedBlocksPerSection == null) this.changedBlocksPerSection = new ShortSet[this.levelHeightAccessor.getSectionsCount()];
++    }
+     // Abomination end
+ 
+     public ChunkHolder(ChunkPos pos, int level, LevelHeightAccessor world, LevelLightEngine lightingProvider, ChunkHolder.LevelChangeListener levelUpdateListener, ChunkHolder.PlayerProvider playersWatchingChunkProvider) {
+@@ -159,7 +163,6 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+         this.playerProvider = playersWatchingChunkProvider;
+         // Paper - rewrite chunk system
+         this.setTicketLevel(level);
+-        this.changedBlocksPerSection = new ShortSet[world.getSectionsCount()];
+     }
+ 
+     // CraftBukkit start
+@@ -234,10 +237,12 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     public void blockChanged(BlockPos pos) {
+         LevelChunk chunk = this.playersSentChunkTo.size() == 0 ? null : this.getChunkToSend(); // Paper - rewrite chunk system
+ 
++        changedBlocksPerSectionPrepare();
++
+         if (chunk != null) {
+             int i = this.levelHeightAccessor.getSectionIndex(pos.getY());
+ 
+-            if (i < 0 || i >= this.changedBlocksPerSection.length) return; // CraftBukkit - SPIGOT-6086, SPIGOT-6296
++            if (i < 0 || i >= this.levelHeightAccessor.getSectionsCount()) return; // CraftBukkit - SPIGOT-6086, SPIGOT-6296 // Abomination
+             if (this.changedBlocksPerSection[i] == null) {
+                 this.hasChangedSections = true;
+                 this.changedBlocksPerSection[i] = new ShortOpenHashSet();
+@@ -296,7 +301,13 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+             if (this.hasChangedSections) {
+                 list = this.moonrise$getPlayers(false); // Paper - rewrite chunk system
+ 
+-                for (int i = 0; i < this.changedBlocksPerSection.length; ++i) {
++                // Abomination start
++                int changedBlocksLength = 0;
++                if (this.changedBlocksPerSection != null)
++                    changedBlocksLength = this.changedBlocksPerSection.length;
++                // Abomination end
++
++                for (int i = 0; i < changedBlocksLength; ++i) {
+                     ShortSet shortset = this.changedBlocksPerSection[i];
+ 
+                     if (shortset != null) {

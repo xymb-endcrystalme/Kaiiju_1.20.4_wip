@@ -1,0 +1,83 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Tue, 17 Sep 2024 07:31:45 +0200
+Subject: [PATCH] Memory optimization: ChunkHolder lazy initialize
+ playersSentChunkTo.
+
+:shrug:
+
+diff --git a/src/main/java/net/minecraft/server/level/ChunkHolder.java b/src/main/java/net/minecraft/server/level/ChunkHolder.java
+index d8199875fde46c0e2a4deea79b8867fd75894b8d..df0739e1605bc252e1d9b1fe9f26d2f1a889c26a 100644
+--- a/src/main/java/net/minecraft/server/level/ChunkHolder.java
++++ b/src/main/java/net/minecraft/server/level/ChunkHolder.java
+@@ -51,7 +51,7 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     private ca.spottedleaf.moonrise.patches.chunk_system.scheduling.NewChunkHolder newChunkHolder;
+ 
+     private static final ServerPlayer[] EMPTY_PLAYER_ARRAY = new ServerPlayer[0];
+-    private final ca.spottedleaf.moonrise.common.list.ReferenceList<ServerPlayer> playersSentChunkTo = new ca.spottedleaf.moonrise.common.list.ReferenceList<>(EMPTY_PLAYER_ARRAY);
++    private ca.spottedleaf.moonrise.common.list.ReferenceList<ServerPlayer> playersSentChunkTo = null; // Abomination
+ 
+     private ChunkMap getChunkMap() {
+         return (ChunkMap)this.playerProvider;
+@@ -69,6 +69,7 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+ 
+     @Override
+     public final void moonrise$addReceivedChunk(final ServerPlayer player) {
++        playersSentChunkToPrepare(); // Abomination
+         if (!this.playersSentChunkTo.add(player)) {
+             throw new IllegalStateException("Already sent chunk " + this.pos + " in world '" + ca.spottedleaf.moonrise.common.util.WorldUtil.getWorldName(this.getChunkMap().level) + "' to player " + player);
+         }
+@@ -76,6 +77,7 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+ 
+     @Override
+     public final void moonrise$removeReceivedChunk(final ServerPlayer player) {
++        playersSentChunkToPrepare(); // Abomination
+         if (!this.playersSentChunkTo.remove(player)) {
+             throw new IllegalStateException("Already sent chunk " + this.pos + " in world '" + ca.spottedleaf.moonrise.common.util.WorldUtil.getWorldName(this.getChunkMap().level) + "' to player " + player);
+         }
+@@ -83,17 +85,19 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+ 
+     @Override
+     public final boolean moonrise$hasChunkBeenSent() {
+-        return this.playersSentChunkTo.size() != 0;
++        return playersSentChunkToSize() != 0; // Abomination
+     }
+ 
+     @Override
+     public final boolean moonrise$hasChunkBeenSent(final ServerPlayer to) {
++        if (playersSentChunkToSize() == 0) return false; // Abomination
+         return this.playersSentChunkTo.contains(to);
+     }
+ 
+     @Override
+     public final List<ServerPlayer> moonrise$getPlayers(final boolean onlyOnWatchDistanceEdge) {
+         final List<ServerPlayer> ret = new java.util.ArrayList<>();
++        if (playersSentChunkToSize() == 0) return ret; // Abomination
+         final ServerPlayer[] raw = this.playersSentChunkTo.getRawDataUnchecked();
+         for (int i = 0, len = this.playersSentChunkTo.size(); i < len; ++i) {
+             final ServerPlayer player = raw[i];
+@@ -152,6 +156,15 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     private void changedBlocksPerSectionPrepare() {
+         if (this.changedBlocksPerSection == null) this.changedBlocksPerSection = new ShortSet[this.levelHeightAccessor.getSectionsCount()];
+     }
++
++    private void playersSentChunkToPrepare() {
++        if (this.playersSentChunkTo == null) this.playersSentChunkTo = new ca.spottedleaf.moonrise.common.list.ReferenceList<>(EMPTY_PLAYER_ARRAY);
++    }
++
++    private int playersSentChunkToSize() {
++        if (this.playersSentChunkTo == null) return 0;
++        return this.playersSentChunkTo.size();
++    }
+     // Abomination end
+ 
+     public ChunkHolder(ChunkPos pos, int level, LevelHeightAccessor world, LevelLightEngine lightingProvider, ChunkHolder.LevelChangeListener levelUpdateListener, ChunkHolder.PlayerProvider playersWatchingChunkProvider) {
+@@ -235,7 +248,7 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     }
+ 
+     public void blockChanged(BlockPos pos) {
+-        LevelChunk chunk = this.playersSentChunkTo.size() == 0 ? null : this.getChunkToSend(); // Paper - rewrite chunk system
++        LevelChunk chunk = this.playersSentChunkToSize() == 0 ? null : this.getChunkToSend(); // Paper - rewrite chunk system // Abomination
+ 
+         changedBlocksPerSectionPrepare();
+ 

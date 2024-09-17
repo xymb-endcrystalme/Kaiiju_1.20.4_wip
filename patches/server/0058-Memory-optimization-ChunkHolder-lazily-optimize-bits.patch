@@ -1,0 +1,83 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Tue, 17 Sep 2024 06:42:23 +0200
+Subject: [PATCH] Memory optimization: ChunkHolder lazily optimize bitsets.
+
+852MB->849M
+
+diff --git a/src/main/java/net/minecraft/server/level/ChunkHolder.java b/src/main/java/net/minecraft/server/level/ChunkHolder.java
+index 4db96543e2072e47040bb25a9d97ea6a69c4a43d..409ecea1e03ace2e2c45a1726b5b2d142d058ba1 100644
+--- a/src/main/java/net/minecraft/server/level/ChunkHolder.java
++++ b/src/main/java/net/minecraft/server/level/ChunkHolder.java
+@@ -40,8 +40,8 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     // Paper - rewrite chunk system
+     private boolean hasChangedSections;
+     private final ShortSet[] changedBlocksPerSection;
+-    private final BitSet blockChangedLightSectionFilter;
+-    private final BitSet skyChangedLightSectionFilter;
++    private BitSet blockChangedLightSectionFilter = null; // Abomination
++    private BitSet skyChangedLightSectionFilter = null; // Abomination
+     private final LevelLightEngine lightEngine;
+     // Paper - rewrite chunk system
+     public final ChunkHolder.PlayerProvider playerProvider;
+@@ -140,12 +140,19 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     }
+     // Paper end - rewrite chunk system
+ 
++    // Abomination start - optimize memory
++    private void blockChangedLightSectionFilterPrepare() {
++        if (this.blockChangedLightSectionFilter == null) this.blockChangedLightSectionFilter = new BitSet();
++    }
++
++    private void skyChangedLightSectionFilterPrepare() {
++        if (this.skyChangedLightSectionFilter == null) this.skyChangedLightSectionFilter = new BitSet();
++    }
++    // Abomination end
++
+     public ChunkHolder(ChunkPos pos, int level, LevelHeightAccessor world, LevelLightEngine lightingProvider, ChunkHolder.LevelChangeListener levelUpdateListener, ChunkHolder.PlayerProvider playersWatchingChunkProvider) {
+         super(pos);
+         // Paper - rewrite chunk system
+-        this.blockChangedLightSectionFilter = new BitSet();
+-        this.skyChangedLightSectionFilter = new BitSet();
+-        // Paper - rewrite chunk system
+         this.levelHeightAccessor = world;
+         this.lightEngine = lightingProvider;
+         // Paper - rewrite chunk system
+@@ -255,8 +262,10 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+                     int l = y - j;
+ 
+                     if (lightType == LightLayer.SKY) {
++                        this.skyChangedLightSectionFilterPrepare(); // Abomination
+                         this.skyChangedLightSectionFilter.set(l);
+                     } else {
++                        this.blockChangedLightSectionFilterPrepare(); // Abomination
+                         this.blockChangedLightSectionFilter.set(l);
+                     }
+ 
+@@ -266,20 +275,22 @@ public class ChunkHolder extends GenerationChunkHolder implements ca.spottedleaf
+     }
+ 
+     public void broadcastChanges(LevelChunk chunk) {
+-        if (this.hasChangedSections || !this.skyChangedLightSectionFilter.isEmpty() || !this.blockChangedLightSectionFilter.isEmpty()) {
++        if (this.hasChangedSections || this.skyChangedLightSectionFilter != null || this.blockChangedLightSectionFilter != null) { // Abomination
+             Level world = chunk.getLevel();
+             List list;
+ 
+-            if (!this.skyChangedLightSectionFilter.isEmpty() || !this.blockChangedLightSectionFilter.isEmpty()) {
++            if (this.skyChangedLightSectionFilter != null || this.blockChangedLightSectionFilter != null) { // Abomination
+                 list = this.moonrise$getPlayers(true); // Paper - rewrite chunk system
+                 if (!list.isEmpty()) {
++                    blockChangedLightSectionFilterPrepare(); // Abomination
++                    skyChangedLightSectionFilterPrepare(); // Abomination
+                     ClientboundLightUpdatePacket packetplayoutlightupdate = new ClientboundLightUpdatePacket(chunk.getPos(), this.lightEngine, this.skyChangedLightSectionFilter, this.blockChangedLightSectionFilter);
+ 
+                     this.broadcast(list, packetplayoutlightupdate);
+                 }
+ 
+-                this.skyChangedLightSectionFilter.clear();
+-                this.blockChangedLightSectionFilter.clear();
++                this.skyChangedLightSectionFilter = null; // Abomination - optimize memory
++                this.blockChangedLightSectionFilter = null; // Abomination
+             }
+ 
+             if (this.hasChangedSections) {
