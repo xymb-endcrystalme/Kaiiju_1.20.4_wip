@@ -1,0 +1,90 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Tue, 17 Sep 2024 02:26:06 +0200
+Subject: [PATCH] Memory non-disableable: Optimize IBlockDataList away.
+
+
+diff --git a/src/main/java/ca/spottedleaf/moonrise/patches/block_counting/BlockCountingChunkSection.java b/src/main/java/ca/spottedleaf/moonrise/patches/block_counting/BlockCountingChunkSection.java
+index a08ddb0598d44368af5b6bace971ee31edf9919e..e232ea3df1353cda9ea4373707622b3adebdfa4d 100644
+--- a/src/main/java/ca/spottedleaf/moonrise/patches/block_counting/BlockCountingChunkSection.java
++++ b/src/main/java/ca/spottedleaf/moonrise/patches/block_counting/BlockCountingChunkSection.java
+@@ -8,4 +8,5 @@ public interface BlockCountingChunkSection {
+ 
+     public IBlockDataList moonrise$getTickingBlockList();
+ 
++    public boolean anyTickingBlocks(); // Abomination
+ }
+diff --git a/src/main/java/net/minecraft/server/level/ServerLevel.java b/src/main/java/net/minecraft/server/level/ServerLevel.java
+index 544ec9e3a54d8bbf183be3873b756f1f1bfdf694..3592a228eac4c3bd820b2bf939f515a711797570 100644
+--- a/src/main/java/net/minecraft/server/level/ServerLevel.java
++++ b/src/main/java/net/minecraft/server/level/ServerLevel.java
+@@ -960,6 +960,8 @@ public class ServerLevel extends Level implements WorldGenLevel, ca.spottedleaf.
+                 continue;
+             }
+ 
++            if (!((ca.spottedleaf.moonrise.patches.block_counting.BlockCountingChunkSection)section).anyTickingBlocks()) continue; // Abomination - optimize memory
++
+             final ca.spottedleaf.moonrise.common.list.IBlockDataList tickList = ((ca.spottedleaf.moonrise.patches.block_counting.BlockCountingChunkSection)section).moonrise$getTickingBlockList();
+             if (tickList.size() == 0) {
+                 continue;
+diff --git a/src/main/java/net/minecraft/world/level/chunk/LevelChunkSection.java b/src/main/java/net/minecraft/world/level/chunk/LevelChunkSection.java
+index c3b1caa352b988ec44fa2b2eb0536517711f5460..1c5180deee05a525c7bdc1de3eab8fc859b0a680 100644
+--- a/src/main/java/net/minecraft/world/level/chunk/LevelChunkSection.java
++++ b/src/main/java/net/minecraft/world/level/chunk/LevelChunkSection.java
+@@ -35,15 +35,26 @@ public class LevelChunkSection implements ca.spottedleaf.moonrise.patches.block_
+     }
+ 
+     private int specialCollidingBlocks;
+-    private final ca.spottedleaf.moonrise.common.list.IBlockDataList tickingBlocks = new ca.spottedleaf.moonrise.common.list.IBlockDataList();
++    private ca.spottedleaf.moonrise.common.list.IBlockDataList tickingBlocks = null; // Abomination - memory optimization
+ 
+     @Override
+     public final int moonrise$getSpecialCollidingBlocks() {
+         return this.specialCollidingBlocks;
+     }
+ 
++    // Abomination start
++    private void createTickingBlocks() {
++        if (tickingBlocks == null) tickingBlocks = new ca.spottedleaf.moonrise.common.list.IBlockDataList();
++    }
++
++    public boolean anyTickingBlocks() {
++        return tickingBlocks != null;
++    }
++    // Abomination end
++
+     @Override
+     public final ca.spottedleaf.moonrise.common.list.IBlockDataList moonrise$getTickingBlockList() {
++        this.createTickingBlocks(); // Abomination
+         return this.tickingBlocks;
+     }
+     // Paper end - block counting
+@@ -126,9 +137,11 @@ public class LevelChunkSection implements ca.spottedleaf.moonrise.patches.block_
+         }
+ 
+         if (iblockdata1.isRandomlyTicking()) {
++            this.createTickingBlocks(); // Abomination
+             this.tickingBlocks.remove(x, y, z);
+         }
+         if (state.isRandomlyTicking()) {
++            this.createTickingBlocks(); // Abomination
+             this.tickingBlocks.add(x, y, z, state);
+         }
+         // Paper end - block counting
+@@ -159,7 +172,7 @@ public class LevelChunkSection implements ca.spottedleaf.moonrise.patches.block_
+         this.tickingBlockCount = (short)0;
+         this.tickingFluidCount = (short)0;
+         this.specialCollidingBlocks = (short)0;
+-        this.tickingBlocks.clear();
++        this.tickingBlocks = null; // Abomination
+ 
+         if (this.maybeHas((final BlockState state) -> !state.isAir())) {
+             final PalettedContainer.Data<BlockState> data = this.states.data;
+@@ -197,6 +210,7 @@ public class LevelChunkSection implements ca.spottedleaf.moonrise.patches.block_
+ 
+                     java.util.Objects.checkFromToIndex(0, paletteCount, raw.length);
+                     for (int i = 0; i < paletteCount; ++i) {
++                        this.createTickingBlocks(); // Abomination
+                         this.tickingBlocks.add(raw[i], state);
+                     }
+                 }

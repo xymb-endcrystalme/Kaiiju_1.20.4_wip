@@ -1,15 +1,15 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: Xymb <xymb@endcrystal.me>
 Date: Sun, 15 Sep 2024 17:53:14 +0200
-Subject: [PATCH] WIP: Linear manager
+Subject: [PATCH] WIP: Linear manager - actually seems to be working
 
 
 diff --git a/src/main/java/abomination/LinearManager.java b/src/main/java/abomination/LinearManager.java
 new file mode 100644
-index 0000000000000000000000000000000000000000..6c3010a05b686c2b8d2e6d7c3ff265666a72d430
+index 0000000000000000000000000000000000000000..87cd2ea10ff1967199fd0f7faed3c4fa402591b7
 --- /dev/null
 +++ b/src/main/java/abomination/LinearManager.java
-@@ -0,0 +1,97 @@
+@@ -0,0 +1,116 @@
 +package abomination;
 +
 +import it.unimi.dsi.fastutil.objects.ObjectArrayList;
@@ -25,10 +25,9 @@ index 0000000000000000000000000000000000000000..6c3010a05b686c2b8d2e6d7c3ff26566
 +    }
 +
 +    public static LinearManager instance = new LinearManager("LinearManager");
-+    public final int WORKERS = 6;
-+    public final int SAVE_INTERVAL = 10;
-+    public final int FLUSH_INTERVAL = 60;
-+    Worker[] workers = new Worker[WORKERS];
++    public final int SAVE_INTERVAL = abomination.config.UnsupportedWipOptionsWillChange.linearSaveInterval;
++    public final int FLUSH_INTERVAL = abomination.config.UnsupportedWipOptionsWillChange.linearFlushInterval;
++    Worker[] workers = null;
 +
 +    public final ObjectArrayList<LinearRegionFile> regionCache = new ObjectArrayList();
 +    public final ArrayBlockingQueue<LinearRegionFile> toFlush = new ArrayBlockingQueue(1000);
@@ -40,7 +39,10 @@ index 0000000000000000000000000000000000000000..6c3010a05b686c2b8d2e6d7c3ff26566
 +            synchronized(instance) {
 +                if (!started) {
 +                    started = true;
-+                    for (int i = 0 ; i < WORKERS ; i++) {
++                    int workerNo = abomination.config.UnsupportedWipOptionsWillChange.linearManagerThreads;
++                    if (workerNo < 1) workerNo = 1;
++                    workers = new Worker[workerNo];
++                    for (int i = 0 ; i < workers.length ; i++) {
 +                        workers[i] = new Worker("LinearManagerWorker - " + String.valueOf(i));
 +                        workers[i].setPriority(Thread.NORM_PRIORITY - 3);
 +                        workers[i].start();
@@ -53,26 +55,43 @@ index 0000000000000000000000000000000000000000..6c3010a05b686c2b8d2e6d7c3ff26566
 +
 +    public void addRegion(LinearRegionFile region) {
 +        synchronized(regionCache) {
++            addedRegions++;
 +            regionCache.add(region);
 +        }
 +    }
 +
++    long lastReport = 0;
++    int addedRegions = 0;
++    int toFlushCount = 0;
++    int removedCount = 0;
++
 +    public void run() {
 +        while (!close) {
++            long timestamp = System.currentTimeMillis();
++
++            if (timestamp - lastReport > 60000 && abomination.config.UnsupportedWipOptionsWillChange.linearVerbose) {
++                LOGGER.info("regionCache: " + regionCache.size() + " toFlush: " + toFlush.size() + " addedRegions: " + addedRegions + " toFlushCount: " + toFlushCount + " removedCount: " + removedCount);
++                addedRegions = 0;
++                toFlushCount = 0;
++                removedCount = 0;
++                lastReport = timestamp;
++            }
++
 +            synchronized(regionCache) {
-+                long timestamp = System.currentTimeMillis();
 +                for (int i = 0 ; i < regionCache.size() ; i++) {
 +                    LinearRegionFile file = regionCache.get(i);
 +                    if (file.close) {
-+                        if (abomination.config.UnsupportedWipOptionsWillChange.linearVerbose)
++                        if (abomination.config.UnsupportedWipOptionsWillChange.linearVeryVerbose)
 +                            LOGGER.info("Region file marking to remove " + file + " lastRead: " + ((timestamp - file.lastRead) / 1000.) + " lastWrite: " + ((timestamp - file.lastWrite) / 1000.) + " lastFlush: " + ((timestamp - file.lastFlush) / 1000.));
 +                        regionCache.remove(i);
++                        removedCount++;
 +                    } else {
 +                        try {
 +                            if (file.markedToSave && ((timestamp - file.lastWrite) / 1000. > SAVE_INTERVAL || (timestamp - file.lastFlush) / 1000. > FLUSH_INTERVAL)) {
-+                                if (abomination.config.UnsupportedWipOptionsWillChange.linearVerbose)
++                                if (abomination.config.UnsupportedWipOptionsWillChange.linearVeryVerbose)
 +                                    LOGGER.info("Region file marking to save " + file + " lastRead: " + ((timestamp - file.lastRead) / 1000.) + " lastWrite: " + ((timestamp - file.lastWrite) / 1000.) + " lastFlush: " + ((timestamp - file.lastFlush) / 1000.));
 +                                toFlush.add(file);
++                                toFlushCount++;
 +                            }
 +                        } catch(IllegalStateException ex) {
 +                            LOGGER.info("Linear is too slow for this machine! Backlog full!");
@@ -197,13 +216,17 @@ index 92bb140c4cb290b1872b745c8101097fec18f644..a489c45469dc34a38ac9412e09cccd7b
          return (x & 31) + ((z & 31) << 5);
      }
 diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
-index 0c8e7a7a6df380b0548a158a7edd4c3e008e610b..ec1fdfd66655af8171069378693db6538ebb4ce6 100644
+index 0c8e7a7a6df380b0548a158a7edd4c3e008e610b..81b04b0c4b1cd82d3af81e927f9c2b35749ae550 100644
 --- a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
 +++ b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
-@@ -40,4 +40,6 @@ public class UnsupportedWipOptionsWillChange {
+@@ -40,4 +40,10 @@ public class UnsupportedWipOptionsWillChange {
      public static boolean disablePlayerHiding = false;
      public static boolean hideRejectingUseItemOnPacketMessages = false;
      public static int chatSlowdownPerPlayer = 0;
 +
 +    public static boolean linearVerbose = false;
++    public static boolean linearVeryVerbose = false;
++    public static int linearManagerThreads = 6;
++    public static int linearSaveInterval = 30;
++    public static int linearFlushInterval = 60;
  }
