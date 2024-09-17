@@ -3,6 +3,7 @@ From: Xymb <xymb@endcrystal.me>
 Date: Tue, 17 Sep 2024 02:59:36 +0200
 Subject: [PATCH] Memory non-disableable: Optimize ZeroBitStorage
 
+872M->859M
 
 diff --git a/src/main/java/net/minecraft/util/ZeroBitStorage.java b/src/main/java/net/minecraft/util/ZeroBitStorage.java
 index 15c5164d0ef41a978c16ee317fa73e97f2480207..7b5ad39e999a3d9a45fae425fcebbf8af8ad7305 100644

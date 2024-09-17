@@ -3,6 +3,7 @@ From: Xymb <xymb@endcrystal.me>
 Date: Tue, 17 Sep 2024 02:26:06 +0200
 Subject: [PATCH] Memory non-disableable: Optimize IBlockDataList away.
 
+928M->872M
 
 diff --git a/src/main/java/ca/spottedleaf/moonrise/patches/block_counting/BlockCountingChunkSection.java b/src/main/java/ca/spottedleaf/moonrise/patches/block_counting/BlockCountingChunkSection.java
 index a08ddb0598d44368af5b6bace971ee31edf9919e..e232ea3df1353cda9ea4373707622b3adebdfa4d 100644
