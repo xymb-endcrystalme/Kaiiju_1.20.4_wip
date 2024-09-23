@@ -1,0 +1,30 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Mon, 23 Sep 2024 04:38:02 +0200
+Subject: [PATCH] Supress warnings: Supress "Ignoring unknown attribute"
+ messages.
+
+
+diff --git a/src/main/java/abomination/config/SupressWarnings.java b/src/main/java/abomination/config/SupressWarnings.java
+index 7830d9400daa50e77c22939dac8f42190e61fa1e..8719dffde53987cf0cd98779a9dd84fada670be4 100644
+--- a/src/main/java/abomination/config/SupressWarnings.java
++++ b/src/main/java/abomination/config/SupressWarnings.java
+@@ -2,4 +2,5 @@ package abomination.config;
+ 
+ public class SupressWarnings {
+     public static boolean movedTooQuickly = false;
++    public static boolean ignoringUnknownAttribute = false;
+ }
+diff --git a/src/main/java/net/minecraft/world/entity/ai/attributes/AttributeMap.java b/src/main/java/net/minecraft/world/entity/ai/attributes/AttributeMap.java
+index 69992ebc999ea3ff9e47e4e049bcc514c01150ca..a84b5e366502943d1d4797111d7edd74e509fbaf 100644
+--- a/src/main/java/net/minecraft/world/entity/ai/attributes/AttributeMap.java
++++ b/src/main/java/net/minecraft/world/entity/ai/attributes/AttributeMap.java
+@@ -134,7 +134,7 @@ public class AttributeMap {
+                     if (attributeInstance != null) {
+                         attributeInstance.load(compoundTag);
+                     }
+-                }, () -> LOGGER.warn("Ignoring unknown attribute '{}'", resourceLocation));
++                }, () -> {if(!abomination.config.SupressWarnings.ignoringUnknownAttribute) LOGGER.warn("Ignoring unknown attribute '{}'", resourceLocation);}); // Abomination
+             } else {
+                 LOGGER.warn("Ignoring malformed attribute '{}'", string);
+             }

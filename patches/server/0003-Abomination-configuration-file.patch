@@ -405,6 +405,16 @@ index 0000000000000000000000000000000000000000..8793f8d86e59728e7948ca1e2ab74341
 +
 +public class Security {
 +}
+diff --git a/src/main/java/abomination/config/SupressWarnings.java b/src/main/java/abomination/config/SupressWarnings.java
+new file mode 100644
+index 0000000000000000000000000000000000000000..5519700389e26ccb4a0681e1b3878cf1fc260ca6
+--- /dev/null
++++ b/src/main/java/abomination/config/SupressWarnings.java
+@@ -0,0 +1,4 @@
++package abomination.config;
++
++public class SupressWarnings {
++}
 diff --git a/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java b/src/main/java/abomination/config/UnsupportedWipOptionsWillChange.java
 new file mode 100644
 index 0000000000000000000000000000000000000000..692e8ae6b37008ea443dd4f7f8e6e3503d62b00b

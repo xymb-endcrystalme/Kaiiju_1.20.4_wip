@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Xymb <xymb@endcrystal.me>
+Date: Mon, 23 Sep 2024 04:16:11 +0200
+Subject: [PATCH] Supress warnings: Supress "moved too quickly!" messages.
+
+
+diff --git a/src/main/java/abomination/config/SupressWarnings.java b/src/main/java/abomination/config/SupressWarnings.java
+index 5519700389e26ccb4a0681e1b3878cf1fc260ca6..7830d9400daa50e77c22939dac8f42190e61fa1e 100644
+--- a/src/main/java/abomination/config/SupressWarnings.java
++++ b/src/main/java/abomination/config/SupressWarnings.java
+@@ -1,4 +1,5 @@
+ package abomination.config;
+ 
+ public class SupressWarnings {
++    public static boolean movedTooQuickly = false;
+ }
+diff --git a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+index f919f7246cba96df1357ca6e6656a998af31fb42..2384b7a669f1a258095b3177b8c7ae53403684b3 100644
+--- a/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
++++ b/src/main/java/net/minecraft/server/network/ServerGamePacketListenerImpl.java
+@@ -618,6 +618,7 @@ public class ServerGamePacketListenerImpl extends ServerCommonPacketListenerImpl
+ 
+                 if (d10 - d9 > Math.max(100.0D, Math.pow((double) (org.spigotmc.SpigotConfig.movedTooQuicklyMultiplier * (float) i * speed), 2)) && !this.isSingleplayerOwner()) {
+                 // CraftBukkit end
++                    if (!abomination.config.SupressWarnings.movedTooQuickly) // Abomination
+                     ServerGamePacketListenerImpl.LOGGER.warn("{} (vehicle of {}) moved too quickly! {},{},{}", new Object[]{entity.getName().getString(), this.player.getName().getString(), d6, d7, d8});
+                     this.send(new ClientboundMoveVehiclePacket(entity));
+                     return;
